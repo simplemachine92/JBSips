@@ -7,6 +7,7 @@ import "@jbx-protocol/juice-delegates-registry/src/JBDelegatesRegistry.sol";
 import {JBSips} from "../src/JBSips.sol";
 import {IJBSips} from "../src/interfaces/IJBSips.sol";
 import {IJBSplitAllocator} from "@jbx-protocol/juice-contracts-v3/contracts/interfaces/IJBSplitAllocator.sol";
+import {JBSplitAllocationData} from "@jbx-protocol/juice-contracts-v3/contracts/structs/JBSplitAllocationData.sol";
 
 import { ISablierV2LockupDynamic } from "@sablier/v2-core/interfaces/ISablierV2LockupDynamic.sol";
 import { ISablierV2LockupLinear } from "@sablier/v2-core/interfaces/ISablierV2LockupLinear.sol";
@@ -19,7 +20,7 @@ import {JBSplit} from "@jbx-protocol/juice-contracts-v3/contracts/structs/JBSpli
 
 import {Test, console2} from "forge-std/Test.sol";
 
-contract CounterTest is TestBaseWorkflowV3 {
+contract SipsTest is TestBaseWorkflowV3 {
 
     using JBFundingCycleMetadataResolver for JBFundingCycle;
 
@@ -42,26 +43,20 @@ contract CounterTest is TestBaseWorkflowV3 {
     JBDelegatesRegistry delegatesRegistry;
 
     function setUp() public override {
+         /* 
+        This setup deploys a new JB project and funding cycle, 
+        and then attaches our Split Allocator to that funding cycle
+        */
 
         string memory rpc = vm.envString("MAINNET_RPC_URL");
 
         mainnetFork = vm.createFork(rpc);
 
-         /* 
-        This setup deploys a new JB project and funding cycle, 
-        and then attaches our Split Allocator to that funding cycle's splits
-        */
-
         // Provides us with _jbOperatorStore and _jbETHPaymentTerminal
         super.setUp();
 
         // Placeholder project metadata, would customize this in prod.
-        _projectMetadata = JBProjectMetadata({content: "myIPFSHash", domain: 1});
-
-        /* // https://docs.juicebox.money/dev/extensions/juice-delegates-registry/jbdelegatesregistry/
-        delegatesRegistry = new JBDelegatesRegistry(IJBDelegatesRegistry(address(0))); */
-
-        address _delegateImpl = address(0);
+        _projectMetadata = JBProjectMetadata({content: "myIPFSHash", domain: 1}); 
 
         // The following describes the funding cycle, access constraints, and metadata necessary for our project.
         _data = JBFundingCycleData({
@@ -90,9 +85,9 @@ contract CounterTest is TestBaseWorkflowV3 {
             allowControllerMigration: false,
             holdFees: false,
             useTotalOverflowForRedemptions: false,
-            useDataSourceForPay: true,
+            useDataSourceForPay: false,
             useDataSourceForRedeem: false,
-            dataSource: address(_delegateImpl),
+            dataSource: address(0),
             metadata: 0
         });
 
@@ -120,19 +115,20 @@ contract CounterTest is TestBaseWorkflowV3 {
             ISablierV2LockupLinear(0xB10daee1FCF62243aE27776D7a92D39dC8740f95), 
             _jbController
         );
+        vm.label(address(_sips), "Sips Contract");
 
         _splits[0] = JBSplit({
         preferClaimed: false,
         preferAddToBalance: false,
         percent: 1_000_000_000,
         projectId: 1,
-        beneficiary: payable(0),
+        beneficiary: payable(address(0)),
         lockedUntil: 0,
         allocator: IJBSplitAllocator(address(_sips))
         });
 
         _groupedSplits[0] = JBGroupedSplits({
-            group: 0,
+            group: 1,
             splits: _splits
         });
 
@@ -146,13 +142,44 @@ contract CounterTest is TestBaseWorkflowV3 {
             0,
             _groupedSplits,
             _fundAccessConstraints,
-             _terminals,
+            _terminals,
             ""
         );
+        
+    }
 
-        (, JBFundingCycleMetadata memory metadata, ) = _jbController.latestConfiguredFundingCycleOf(1);
+    function testPayout() public {
+        // Load our project with some eth
+        vm.deal(address(123), 20 ether);
+        vm.prank(address(123));
+        _jbETHPaymentTerminal.pay{value: 10 ether}(_projectId, 10 ether, address(0x000000000000000000000000000000000000EEEe), address(123), 0, false, "", "");
+    
+        vm.prank(address(123));
+        _jbETHPaymentTerminal.distributePayoutsOf(_projectId, 2 ether, 1, address(0x000000000000000000000000000000000000EEEe), 0, "");
+        emit log_uint(address(_sips).balance);
+    }
 
-        vm.label(metadata.dataSource, "Initialized DS");
+    function testFail_allocateExternal() public {
+        vm.prank(address(123));
+        JBSplitAllocationData memory alloData = JBSplitAllocationData({
+            token: address(0),
+            amount: 0,
+            decimals: 0,
+            projectId: 1,
+            group: 1,
+            split: 
+            JBSplit({
+                preferClaimed: false,
+                preferAddToBalance: false,
+                percent: 1_000_000_000,
+                projectId: 1,
+                beneficiary: payable(address(0)),
+                lockedUntil: 0,
+                allocator: IJBSplitAllocator(address(_sips))
+                })
+        });
+
+        _sips.allocate{value: 0}(alloData);
     }
 
 }

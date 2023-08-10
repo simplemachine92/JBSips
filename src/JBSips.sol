@@ -7,6 +7,8 @@ import {IJBDirectory} from '@jbx-protocol/juice-contracts-v3/contracts/interface
 import {IJBOperatorStore} from "@jbx-protocol/juice-contracts-v3/contracts/interfaces/IJBOperatorStore.sol";
 import {IJBController3_1} from "@jbx-protocol/juice-contracts-v3/contracts/interfaces/IJBController3_1.sol";
 
+import {ERC165, IERC165} from "@openzeppelin/contracts/utils/introspection/ERC165.sol";
+
 import {JBSplitAllocationData} from "@jbx-protocol/juice-contracts-v3/contracts/structs/JBSplitAllocationData.sol";
 import {JBOperatable} from "@jbx-protocol/juice-contracts-v3/contracts/abstract/JBOperatable.sol";
 import {JBOperations} from "@jbx-protocol/juice-contracts-v3/contracts/libraries/JBOperations.sol";
@@ -28,7 +30,7 @@ import { IERC20 } from "@sablier/v2-core/types/Tokens.sol";
  *         interact with Sablier v2 streams of which they are the beneficiary.
  * @dev -- notes n stuff --
 */
-contract JBSips is IJBSplitAllocator, JBOperatable {
+contract JBSips is IJBSplitAllocator, JBOperatable, ERC165 {
 
     //*********************************************************************//
     // --------------------------- custom errors ------------------------- //
@@ -78,8 +80,8 @@ contract JBSips is IJBSplitAllocator, JBOperatable {
     /// @dev See {IERC165-supportsInterface}.
     /// @param _interfaceId The ID of the interface to check for adherence to.
     /// @return A flag indicating if the provided interface ID is supported.
-    function supportsInterface(bytes4 _interfaceId) public view virtual override returns (bool) {
-        return _interfaceId == type(IJBSplitAllocator).interfaceId;
+    function supportsInterface(bytes4 _interfaceId) public view virtual override(ERC165, IERC165) returns (bool) {
+        return _interfaceId == type(IJBSplitAllocator).interfaceId || super.supportsInterface(_interfaceId);
     }
 
     /// @notice Called by a project's payout (JBTerminal) or reserved token distribution split (JBController)
@@ -87,7 +89,7 @@ contract JBSips is IJBSplitAllocator, JBOperatable {
     /// @param _data See https://docs.juicebox.money/dev/api/data-structures/jbsplitallocationdata/
     function allocate(JBSplitAllocationData calldata _data) external payable {
         // Ensure call is coming from Terminal or Controller
-        if (!directory.isTerminalOf(_data.projectId, IJBPaymentTerminal(msg.sender)) || directory.controllerOf(_data.projectId) != msg.sender)
+        if (!directory.isTerminalOf(_data.projectId, IJBPaymentTerminal(msg.sender)) && directory.controllerOf(_data.projectId) != msg.sender)
             revert JuiceSips_Unauthorized();
         
         // Logic for payouts
@@ -101,13 +103,12 @@ contract JBSips is IJBSplitAllocator, JBOperatable {
     function withdrawFromStream() external {}
 
     function configureRecipients()
-        external requirePermission(controller.projects().ownerOf(projectId), projectId, JBOperations.SET_SPLITS) {
-
-    }
+        external requirePermission(controller.projects().ownerOf(projectId), projectId, JBOperations.SET_SPLITS) {}
 
     function cancelStreams()
-        external requirePermission(controller.projects().ownerOf(projectId), projectId, JBOperations.SET_SPLITS) {
+        external requirePermission(controller.projects().ownerOf(projectId), projectId, JBOperations.SET_SPLITS) {}
 
-    }
+    // Function to receive Ether. msg.data must be empty
+    receive() external payable {}
 
 }
