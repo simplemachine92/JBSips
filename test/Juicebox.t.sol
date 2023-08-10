@@ -4,13 +4,18 @@ pragma solidity ^0.8.13;
 import "./helpers/TestBaseWorkflowV3.sol";
 import "@jbx-protocol/juice-delegates-registry/src/JBDelegatesRegistry.sol";
 
+import {JBSips} from "../src/JBSips.sol";
+import {IJBSips} from "../src/interfaces/IJBSips.sol";
+import {IJBSplitAllocator} from "@jbx-protocol/juice-contracts-v3/contracts/interfaces/IJBSplitAllocator.sol";
 
+import { ISablierV2LockupDynamic } from "@sablier/v2-core/interfaces/ISablierV2LockupDynamic.sol";
 import { ISablierV2LockupLinear } from "@sablier/v2-core/interfaces/ISablierV2LockupLinear.sol";
 
 import {IJBDelegatesRegistry} from "@jbx-protocol/juice-delegates-registry/src/interfaces/IJBDelegatesRegistry.sol";
 import {IJBFundingCycleBallot} from "@jbx-protocol/juice-contracts-v3/contracts/interfaces/IJBFundingCycleBallot.sol";
 import {JBGlobalFundingCycleMetadata} from "@jbx-protocol/juice-contracts-v3/contracts/structs/JBFundingCycleMetadata.sol";
 import {JBOperatorData} from "@jbx-protocol/juice-contracts-v3/contracts/structs/JBOperatorData.sol";
+import {JBSplit} from "@jbx-protocol/juice-contracts-v3/contracts/structs/JBSplit.sol";
 
 import {Test, console2} from "forge-std/Test.sol";
 
@@ -18,61 +23,46 @@ contract CounterTest is TestBaseWorkflowV3 {
 
     using JBFundingCycleMetadataResolver for JBFundingCycle;
 
+    // Assigned when project is launched
+    uint256 _projectId;
+
+    // the identifiers of the forks
+    uint256 mainnetFork;
+    uint256 optimismFork;
+
     // Project setup params
     JBProjectMetadata _projectMetadata;
     JBFundingCycleData _data;
     JBFundingCycleMetadata _metadata;
     JBFundAccessConstraints[] _fundAccessConstraints; // Default empty
     IJBPaymentTerminal[] _terminals; // Default empty
-    /* IJBStrawsDelegate _straws;
-    Merkle _m; */
+    JBSips _sips;
 
     // Delegate setup params
     JBDelegatesRegistry delegatesRegistry;
-    /* JBStraws _delegateImpl;
-    JBStrawsDeployer _delegateDepl;
-    DeployJBStrawsData delegateData;
-    JBStrawsProjectDeployer projectDepl; */
-
-    /* // Assigned when project is launched
-    uint256 _projectId;
-
-    // Used in JBFundingCycleMetadata, 4500 = 45% I believe, but using 0 for testing calcs
-    uint256 reservedRate = 0;
-
-    // Used in JBFundingCycleData
-    uint256 weight = 10 ** 18; // Minting 1 token per eth
-
-    bytes32 tRoot;
-    bytes32 tRoot2; */
 
     function setUp() public override {
+
+        string memory rpc = vm.envString("MAINNET_RPC_URL");
+
+        mainnetFork = vm.createFork(rpc);
+
+         /* 
+        This setup deploys a new JB project and funding cycle, 
+        and then attaches our Split Allocator to that funding cycle's splits
+        */
+
         // Provides us with _jbOperatorStore and _jbETHPaymentTerminal
         super.setUp();
-
-        /* 
-        This setup follows a DelegateProjectDeployer pattern like in https://docs.juicebox.money/dev/extensions/juice-721-delegate/
-        It deploys a new JB project and funding cycle, and then attaches our delegate to that funding cycle as a DataSource and Delegate.
-        */
 
         // Placeholder project metadata, would customize this in prod.
         _projectMetadata = JBProjectMetadata({content: "myIPFSHash", domain: 1});
 
-        // https://docs.juicebox.money/dev/extensions/juice-delegates-registry/jbdelegatesregistry/
-        delegatesRegistry = new JBDelegatesRegistry(IJBDelegatesRegistry(address(0)));
-
-        /* // Instance of our delegate code
-        _delegateImpl = new JBStraws(_jbOperatorStore);
-
-        // Required for our custom project deployer below, eventually attaches the delegate to the funding cycle.
-        _delegateDepl = new JBStrawsDeployer(_delegateImpl, delegatesRegistry);
-
-        // Custom deployer
-        projectDepl = new JBStrawsProjectDeployer(_delegateDepl, _jbOperatorStore);
- 
-        */
+        /* // https://docs.juicebox.money/dev/extensions/juice-delegates-registry/jbdelegatesregistry/
+        delegatesRegistry = new JBDelegatesRegistry(IJBDelegatesRegistry(address(0))); */
 
         address _delegateImpl = address(0);
+
         // The following describes the funding cycle, access constraints, and metadata necessary for our project.
         _data = JBFundingCycleData({
             duration: 30 days,
@@ -120,43 +110,49 @@ contract CounterTest is TestBaseWorkflowV3 {
         // Imported from TestBaseWorkflowV3.sol via super.setUp() https://docs.juicebox.money/dev/learn/architecture/terminals/
         _terminals = [_jbETHPaymentTerminal];
 
-        /* JBGroupedSplits[] memory _groupedSplits = new JBGroupedSplits[](1); // Default empty */
+        JBGroupedSplits[] memory _groupedSplits = new JBGroupedSplits[](1); // Default empty
+        JBSplit[] memory _splits = new JBSplit[](1);
 
-        /* // The imported struct used by our delegate
-        delegateData = DeployJBStrawsData({
-            initPayRoot: tRoot,
-            initRedeemRoot: tRoot2,
-            initPayWL: false,
-            initRedeemWL: false
+        _sips = new JBSips(
+            1,
+            _jbDirectory, 
+            _jbOperatorStore, 
+            ISablierV2LockupLinear(0xB10daee1FCF62243aE27776D7a92D39dC8740f95), 
+            _jbController
+        );
+
+        _splits[0] = JBSplit({
+        preferClaimed: false,
+        preferAddToBalance: false,
+        percent: 1_000_000_000,
+        projectId: 1,
+        beneficiary: payable(0),
+        lockedUntil: 0,
+        allocator: IJBSplitAllocator(address(_sips))
         });
 
-        // Assemble all of our previous configuration for our project deployer
-         LaunchProjectData memory launchProjectData = LaunchProjectData({
-            projectMetadata: _projectMetadata,
-            data: _data,
-            metadata: _metadata,
-            mustStartAtOrAfter: 0,
-            groupedSplits: _groupedSplits,
-            fundAccessConstraints: _fundAccessConstraints,
-            terminals: _terminals,
-            memo: ""
+        _groupedSplits[0] = JBGroupedSplits({
+            group: 0,
+            splits: _splits
         });
-
 
         // Blastoff
         vm.prank(address(123));
-        _projectId = projectDepl.launchProjectFor(
+        _projectId = _jbController.launchProjectFor(
             address(123),
-            delegateData,
-            launchProjectData,
-            _jbController
-        ); */
+            _projectMetadata,
+            _data,
+            _metadata,
+            0,
+            _groupedSplits,
+            _fundAccessConstraints,
+             _terminals,
+            ""
+        );
 
         (, JBFundingCycleMetadata memory metadata, ) = _jbController.latestConfiguredFundingCycleOf(1);
 
         vm.label(metadata.dataSource, "Initialized DS");
-
-        /* _straws = IJBStrawsDelegate(metadata.dataSource); */
     }
 
 }
