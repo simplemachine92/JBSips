@@ -10,3 +10,6 @@
 [submodule "lib/prb-proxy"]
 	path = lib/prb-proxy
 	url = https://github.com/PaulRBerg/prb-proxy
+[submodule "lib/prb-math"]
+	path = lib/prb-math
+	url = https://github.com/PaulRBerg/prb-math
