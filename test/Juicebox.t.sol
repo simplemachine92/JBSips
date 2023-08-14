@@ -12,6 +12,7 @@ import {JBSplitAllocationData} from "@jbx-protocol/juice-contracts-v3/contracts/
 import { ISablierV2LockupDynamic } from "@sablier/v2-core/interfaces/ISablierV2LockupDynamic.sol";
 import { ISablierV2LockupLinear } from "@sablier/v2-core/interfaces/ISablierV2LockupLinear.sol";
 import { ISablierV2ProxyPlugin } from "@sablier/v2-periphery/interfaces/ISablierV2ProxyPlugin.sol";
+import { ISablierV2ProxyTarget } from "@sablier/v2-periphery/interfaces/ISablierV2ProxyTarget.sol";
 
 import {IJBDelegatesRegistry} from "@jbx-protocol/juice-delegates-registry/src/interfaces/IJBDelegatesRegistry.sol";
 import {IJBFundingCycleBallot} from "@jbx-protocol/juice-contracts-v3/contracts/interfaces/IJBFundingCycleBallot.sol";
@@ -117,6 +118,7 @@ contract SipsTest is TestBaseWorkflowV3 {
             _jbOperatorStore, 
             ISablierV2LockupLinear(0xB10daee1FCF62243aE27776D7a92D39dC8740f95), 
             ISablierV2ProxyPlugin(0x9bdebF4F9adEB99387f46e4020FBf3dDa885D2b8),
+            ISablierV2ProxyTarget(0x297b43aE44660cA7826ef92D8353324C018573Ef),
             _jbController
         );
         vm.label(address(_sips), "Sips Contract");

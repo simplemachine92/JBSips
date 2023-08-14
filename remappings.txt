@@ -1,2 +1,3 @@
 @sablier/v2-core=lib/v2-core/src
 @sablier/v2-periphery=lib/v2-periphery/src
+@prb/math/=lib/prb-math/src/

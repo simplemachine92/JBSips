@@ -24,7 +24,7 @@ import { Broker, LockupLinear, LockupDynamic } from "@sablier/v2-core/types/Data
 import { ud60x18, ud2x18 } from "@sablier/v2-core/types/Math.sol";
 
 import { IERC20 } from "@sablier/v2-core/types/Tokens.sol";
-import { Batch, Broker } from "@sablier/v2-periphery/types/DataTypes.sol";
+import { Batch } from "@sablier/v2-periphery/types/DataTypes.sol";
 import { IAllowanceTransfer, Permit2Params } from "@sablier/v2-periphery/types/Permit2.sol";
 
 /** 
@@ -78,7 +78,8 @@ contract JBSips is IJBSplitAllocator, JBOperatable, ERC165 {
         IJBDirectory _directory, 
         IJBOperatorStore _operatorStore,
         ISablierV2LockupLinear _sablier,
-        ISablierV2ProxyPlugin proxyPlugin_,
+        ISablierV2ProxyPlugin _proxyPlugin,
+        ISablierV2ProxyTarget _proxyTarget,
         IJBController3_1 _controller
     )   JBOperatable(_operatorStore) 
     {
@@ -91,7 +92,9 @@ contract JBSips is IJBSplitAllocator, JBOperatable, ERC165 {
         sablier = _sablier;
 
         /// @dev Proxy deployer with plugin https://docs.sablier.com/contracts/v2/guides/proxy-architecture/deploy
-        proxyPlugin = proxyPlugin_;
+        proxyPlugin = _proxyPlugin;
+
+        proxyTarget = _proxyTarget;
 
         controller = _controller;
     }
