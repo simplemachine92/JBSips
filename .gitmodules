@@ -16,3 +16,6 @@
 [submodule "lib/univ3-periph"]
 	path = lib/univ3-periph
 	url = https://github.com/uniswap/v3-periphery
+[submodule "lib/univ3-core"]
+	path = lib/univ3-core
+	url = https://github.com/uniswap/v3-core
