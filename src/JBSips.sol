@@ -29,18 +29,14 @@ import {IJBSplitAllocator} from "@jbx-protocol/juice-contracts-v3/contracts/inte
 import {IJBPaymentTerminal} from "@jbx-protocol/juice-contracts-v3/contracts/interfaces/IJBPaymentTerminal.sol";
 import {IJBDirectory} from '@jbx-protocol/juice-contracts-v3/contracts/interfaces/IJBDirectory.sol';
 import {IJBOperatorStore} from "@jbx-protocol/juice-contracts-v3/contracts/interfaces/IJBOperatorStore.sol";
-import {IJBController3_1} from "@jbx-protocol/juice-contracts-v3/contracts/interfaces/IJBController3_1.sol";
 
-import {ERC165, IERC165} from "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
 
 import {JBSplitAllocationData} from "@jbx-protocol/juice-contracts-v3/contracts/structs/JBSplitAllocationData.sol";
 import {JBOperatable} from "@jbx-protocol/juice-contracts-v3/contracts/abstract/JBOperatable.sol";
 import {JBOperations} from "@jbx-protocol/juice-contracts-v3/contracts/libraries/JBOperations.sol";
 
-import { ISablierV2ProxyTarget } from "@sablier/v2-periphery/interfaces/ISablierV2ProxyTarget.sol";
 import { IPRBProxy, IPRBProxyRegistry } from "@sablier/v2-periphery/types/Proxy.sol";
-import { ISablierV2ProxyPlugin } from "@sablier/v2-periphery/interfaces/ISablierV2ProxyPlugin.sol";
 
 import { ISablierV2LockupDynamic } from "@sablier/v2-core/interfaces/ISablierV2LockupDynamic.sol";
 import { ISablierV2LockupLinear } from "@sablier/v2-core/interfaces/ISablierV2LockupLinear.sol";
@@ -62,7 +58,7 @@ import { IAllowanceTransfer, Permit2Params } from "@sablier/v2-periphery/types/P
  *         interact with Sablier v2 streams of which they are the beneficiary.
  * @dev -- notes n stuff --
 */
-contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator, ERC165 {
+contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator {
 
     //*********************************************************************//
     // --------------------------- custom errors ------------------------- //
@@ -87,43 +83,36 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator, ERC165 {
 
     constructor(
         uint256 _projectId, 
-        IJBDirectory _directory, 
-        IJBOperatorStore _operatorStore,
-        ISablierV2LockupLinear _sablier,
-        ISablierV2ProxyPlugin _proxyPlugin,
-        ISablierV2ProxyTarget _proxyTarget,
-        IJBController3_1 _controller
+        address _directory, 
+        address _operatorStore,
+        address _lockupLinear,
+        address _lockupDynamic,
+        address _proxyPlugin,
+        address _proxyTarget,
+        address _controller
         )
         JBSablier(
-        _projectId,
-        _directory,
-        _sablier,
-        _proxyPlugin,
-        _proxyTarget,
-        _controller)
-         JBOperatable(_operatorStore)
+            _projectId,
+            _directory,
+            _lockupLinear,
+            _lockupDynamic,
+            _proxyPlugin,
+            _proxyTarget,
+            _controller
+        )
+        JBOperatable(IJBOperatorStore(_operatorStore))
     {
        /* --- */
     }
-
-
-
-    /// @notice Indicates if this contract adheres to the specified interface.
-    /// @dev See {IERC165-supportsInterface}.
-    /// @param _interfaceId The ID of the interface to check for adherence to.
-    /// @return A flag indicating if the provided interface ID is supported.
-    function supportsInterface(bytes4 _interfaceId) public view virtual override(ERC165, IERC165) returns (bool) {
-        return _interfaceId == type(IJBSplitAllocator).interfaceId || super.supportsInterface(_interfaceId);
-    }
-
 
     /// @notice Called by a project's payout (JBTerminal) or reserved token distribution split (JBController)
     /// @dev See https://docs.juicebox.money/dev/learn/glossary/split-allocator/
     /// @param _data See https://docs.juicebox.money/dev/api/data-structures/jbsplitallocationdata/
     function allocate(JBSplitAllocationData calldata _data) external payable {
         // Ensure call is coming from Terminal or Controller
-        if (!directory.isTerminalOf(_data.projectId, IJBPaymentTerminal(msg.sender)) && directory.controllerOf(_data.projectId) != msg.sender)
-            revert JuiceSips_Unauthorized();
+        if (!directory.isTerminalOf(_data.projectId, IJBPaymentTerminal(msg.sender))
+            && directory.controllerOf(_data.projectId) != msg.sender)
+        revert JuiceSips_Unauthorized();
         
         // Logic for payouts
         if (directory.isTerminalOf(_data.projectId, IJBPaymentTerminal(msg.sender))) {}

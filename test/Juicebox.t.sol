@@ -5,7 +5,6 @@ import "./helpers/TestBaseWorkflowV3.sol";
 import "@jbx-protocol/juice-delegates-registry/src/JBDelegatesRegistry.sol";
 
 import {JBSips} from "../src/JBSips.sol";
-import {IJBSips} from "../src/interfaces/IJBSips.sol";
 import {IJBSplitAllocator} from "@jbx-protocol/juice-contracts-v3/contracts/interfaces/IJBSplitAllocator.sol";
 import {JBSplitAllocationData} from "@jbx-protocol/juice-contracts-v3/contracts/structs/JBSplitAllocationData.sol";
 
@@ -114,12 +113,17 @@ contract SipsTest is TestBaseWorkflowV3 {
 
         _sips = new JBSips(
             1,
-            _jbDirectory, 
-            _jbOperatorStore, 
-            ISablierV2LockupLinear(0xB10daee1FCF62243aE27776D7a92D39dC8740f95), 
-            ISablierV2ProxyPlugin(0x9bdebF4F9adEB99387f46e4020FBf3dDa885D2b8),
-            ISablierV2ProxyTarget(0x297b43aE44660cA7826ef92D8353324C018573Ef),
-            _jbController
+            address(_jbDirectory), 
+            address(_jbOperatorStore),
+            //Linear
+            0xB10daee1FCF62243aE27776D7a92D39dC8740f95, 
+            // Lockup Dynamic
+            0x39EFdC3dbB57B2388CcC4bb40aC4CB1226Bc9E44,
+            // Proxy
+            0x9bdebF4F9adEB99387f46e4020FBf3dDa885D2b8,
+            // Proxy Target
+            0x297b43aE44660cA7826ef92D8353324C018573Ef,
+            address(_jbController)
         );
         vm.label(address(_sips), "Sips Contract");
 
