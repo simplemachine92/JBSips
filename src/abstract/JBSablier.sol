@@ -21,6 +21,10 @@ import { ISablierV2LockupLinear } from "@sablier/v2-core/interfaces/ISablierV2Lo
 import {ERC165, IERC165} from "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 import { IERC20 } from "@sablier/v2-core/types/Tokens.sol";
 
+import { LockupLinear, LockupDynamic } from "@sablier/v2-core/types/DataTypes.sol";
+import { Batch, Broker } from "@sablier/v2-periphery/types/DataTypes.sol";
+import { ud60x18, ud2x18 } from "@sablier/v2-core/types/Math.sol";
+
 import { IAllowanceTransfer, Permit2Params } from "@sablier/v2-periphery/types/Permit2.sol";
 
 abstract contract JBSablier is ERC165, ERC1271 {
@@ -79,5 +83,19 @@ abstract contract JBSablier is ERC165, ERC1271 {
         return _interfaceId == type(IJBSplitAllocator).interfaceId || super.supportsInterface(_interfaceId);
     }
 
+    /// @notice Deploys a PRB proxy and plugin that returns tokens to this address
+    /// @dev See https://docs.sablier.com/contracts/v2/guides/proxy-architecture/deploy
+    /// @return proxy {IPRBProxy} proxy address
+    function deployProxyAndInstallPlugin() internal returns (IPRBProxy proxy) {
+        // Get the proxy for this contract
+        proxy = PROXY_REGISTRY.getProxy({ user: address(this) });
+        if (address(proxy) == address(0)) {
+            // If a proxy doesn't exist, deploy one and install the plugin
+            proxy = PROXY_REGISTRY.deployAndInstallPlugin({ plugin: proxyPlugin });
+        } else {
+            // If the proxy exists, then just install the plugin.
+            PROXY_REGISTRY.installPlugin({ plugin: proxyPlugin });
+        }
+    }
 
 }

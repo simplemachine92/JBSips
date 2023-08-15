@@ -5,6 +5,7 @@ import "./helpers/TestBaseWorkflowV3.sol";
 import "@jbx-protocol/juice-delegates-registry/src/JBDelegatesRegistry.sol";
 
 import {JBSips} from "../src/JBSips.sol";
+import {IJBSablier} from "../src/interfaces/IJBSablier.sol";
 import {IJBSplitAllocator} from "@jbx-protocol/juice-contracts-v3/contracts/interfaces/IJBSplitAllocator.sol";
 import {JBSplitAllocationData} from "@jbx-protocol/juice-contracts-v3/contracts/structs/JBSplitAllocationData.sol";
 
@@ -19,9 +20,13 @@ import {JBGlobalFundingCycleMetadata} from "@jbx-protocol/juice-contracts-v3/con
 import {JBOperatorData} from "@jbx-protocol/juice-contracts-v3/contracts/structs/JBOperatorData.sol";
 import {JBSplit} from "@jbx-protocol/juice-contracts-v3/contracts/structs/JBSplit.sol";
 
+import { IERC20 } from "@sablier/v2-core/types/Tokens.sol";
+
 import {Test, console2} from "forge-std/Test.sol";
 
 contract SipsTest is TestBaseWorkflowV3 {
+
+    IERC20 public constant DAI = IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
 
     using JBFundingCycleMetadataResolver for JBFundingCycle;
 
@@ -53,7 +58,7 @@ contract SipsTest is TestBaseWorkflowV3 {
 
         string memory rpc = vm.envString("MAINNET_RPC_URL");
 
-        mainnetFork = vm.createFork(rpc);
+        mainnetFork = vm.createSelectFork(rpc);
 
         // Provides us with _jbOperatorStore and _jbETHPaymentTerminal
         super.setUp();
@@ -190,6 +195,17 @@ contract SipsTest is TestBaseWorkflowV3 {
         });
 
         _sips.allocate{value: 0}(alloData);
+    }
+
+    function testDeployProxyAndPI() public {
+        vm.prank(address(123));
+        _sips.deploy();
+    }
+
+    function testFail_DoubleDeploy() public {
+        vm.prank(address(123));
+        _sips.deploy();
+        _sips.deploy();
     }
 
 }
