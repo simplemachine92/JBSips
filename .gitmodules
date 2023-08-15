@@ -13,3 +13,6 @@
 [submodule "lib/prb-math"]
 	path = lib/prb-math
 	url = https://github.com/PaulRBerg/prb-math
+[submodule "lib/univ3-periph"]
+	path = lib/univ3-periph
+	url = https://github.com/uniswap/v3-periphery
