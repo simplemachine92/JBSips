@@ -1,4 +1,13 @@
 {
+  "devDependencies": {
+    "prettier": "^2.4.0",
+    "prettier-plugin-solidity": "^1.0.0-beta.19",
+    "solhint": "^3.3.6",
+    "solhint-plugin-prettier": "^0.0.5"
+  },
+  "scripts": {
+    "pretty": "prettier --write \"./src/**/*.{js,jsx,json,sol}\""
+  },
   "dependencies": {
     "@jbx-protocol/juice-contracts-v3": "^4.0.2",
     "@jbx-protocol/juice-delegates-registry": "^1.0.3"
