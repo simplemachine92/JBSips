@@ -94,7 +94,7 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator, IUniswapV3SwapCal
     // --------------------- public stored properties -------------------- //
     //*********************************************************************//
 
-    mapping(address => uint256) public idByAddress;
+    mapping(uint256 cycleNumber => uint256 balance) public cycleTokensReceived;
     uint256 public lastCycleNumber;
 
     // the timeframe to use for the pool twap (from secondAgo to now)
@@ -180,8 +180,6 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator, IUniswapV3SwapCal
             projectId
         );
         lastCycleNumber = _cycle.number;
-
-        /* int256 toSwap = int256(msg.value); */
 
         uint256 quote = _getQuote(msg.value);
 

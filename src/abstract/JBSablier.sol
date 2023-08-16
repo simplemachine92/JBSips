@@ -27,6 +27,12 @@ import {ud60x18, ud2x18} from "@sablier/v2-core/types/Math.sol";
 import {IAllowanceTransfer, Permit2Params} from "@sablier/v2-periphery/types/Permit2.sol";
 
 abstract contract JBSablier is ERC165, ERC1271 {
+        //*********************************************************************//
+    // --------------------------- custom errors ------------------------- //
+    //*********************************************************************//
+
+    error JBSablier_InsufficientBalance();
+
     //*********************************************************************//
     // --------------------- public constant properties ------------------ //
     //*********************************************************************//
@@ -36,8 +42,8 @@ abstract contract JBSablier is ERC165, ERC1271 {
     IJBController3_1 public controller;
 
     IPRBProxy public proxy;
-    ISablierV2LockupLinear public lockupLinear;
-    ISablierV2LockupDynamic public lockupDynamic;
+    ISablierV2LockupLinear public immutable lockupLinear;
+    ISablierV2LockupDynamic public immutable lockupDynamic;
     ISablierV2ProxyTarget public proxyTarget;
     ISablierV2ProxyPlugin public proxyPlugin;
 
@@ -100,6 +106,48 @@ abstract contract JBSablier is ERC165, ERC1271 {
             // If the proxy exists, then just install the plugin.
             PROXY_REGISTRY.installPlugin({plugin: proxyPlugin});
         }
+    }
+
+    function deployStreams(
+        uint256 _total,
+        IERC20 _token,
+        Batch.CreateWithDurations[] calldata _linWithDur, 
+        Batch.CreateWithRange[] calldata _linWithRange, 
+        Batch.CreateWithDeltas[] calldata _dynWithDelta, 
+        Batch.CreateWithMilestones[] calldata _dynWithMiles
+    ) external {
+        if (IERC20(_token).balanceOf(address(this)) < _total ) revert JBSablier_InsufficientBalance();
+
+        // Set up Permit2. See the full documentation at https://github.com/Uniswap/permit2
+        IAllowanceTransfer.PermitDetails memory permitDetails;
+        permitDetails.token = address(_token);
+        permitDetails.amount = uint160(_total);
+        permitDetails.expiration = type(uint48).max; // maximum expiration possible
+        (,, permitDetails.nonce) =
+            PERMIT2.allowance({ user: address(this), token: address(_token), spender: address(proxy) });
+
+        IAllowanceTransfer.PermitSingle memory permitSingle;
+        permitSingle.details = permitDetails;
+        permitSingle.spender = address(proxy); // the proxy will be the spender
+        permitSingle.sigDeadline = type(uint48).max; // same deadline as expiration
+
+        // Declare the Permit2 params needed by Sablier
+        Permit2Params memory permit2Params;
+        permit2Params.permitSingle = permitSingle;
+        permit2Params.signature = bytes(""); // dummy signature
+
+        /* uint256 batchSize = _linWithDur.length + _linWithRange.length + _dynWithDelta.length + _dynWithMiles.length; */
+
+        if (_linWithDur.length > 0) {
+        // Encode the data for the proxy target call
+        bytes memory data =
+            abi.encodeCall(proxyTarget.batchCreateWithDurations, (lockupLinear, _token, _linWithDur, permit2Params));
+
+        // Create a batch of Lockup Linear streams via the proxy and Sablier's proxy target
+        bytes memory response = proxy.execute(address(proxyTarget), data);
+        uint256[] memory streamIds = abi.decode(response, (uint256[]));
+        }
+        
     }
 
 
