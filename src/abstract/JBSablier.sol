@@ -45,8 +45,6 @@ abstract contract JBSablier is ERC165, ERC1271 {
         IPRBProxyRegistry(0x584009E9eDe26e212182c9745F5c000191296a78);
     IAllowanceTransfer public constant PERMIT2 =
         IAllowanceTransfer(0x000000000022D473030F116dDEE9F6B43aC78BA3);
-    IERC20 public constant DAI = 
-        IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
 
     constructor(
         uint256 _projectId,

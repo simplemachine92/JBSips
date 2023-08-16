@@ -21,12 +21,15 @@ import {JBOperatorData} from "@jbx-protocol/juice-contracts-v3/contracts/structs
 import {JBSplit} from "@jbx-protocol/juice-contracts-v3/contracts/structs/JBSplit.sol";
 
 import { IERC20 } from "@sablier/v2-core/types/Tokens.sol";
+import {IWETH9} from "../src/interfaces/external/IWETH9.sol";
+
+import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+import {IUniswapV3SwapCallback} from "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
+import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 
 import {Test, console2} from "forge-std/Test.sol";
 
 contract SipsTest is TestBaseWorkflowV3 {
-
-    IERC20 public constant DAI = IERC20(0x6B175474E89094C44Da98b954EedeAC495271d0F);
 
     using JBFundingCycleMetadataResolver for JBFundingCycle;
 
@@ -49,6 +52,16 @@ contract SipsTest is TestBaseWorkflowV3 {
 
     // Delegate setup params
     JBDelegatesRegistry delegatesRegistry;
+
+    // Pool config
+        uint32 secondsAgo = 100;
+        uint256 twapDelta = 100;
+
+        IUniswapV3Pool pool = IUniswapV3Pool(0x88e6A0c2dDD26FEEb64F039a2c41296FcB3f5640);
+        IERC20 USDC = IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
+        IWETH9 weth = IWETH9(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+        address _uniswapFactory = 0x1F98431c8aD98523631AE4a59f267346ea31F984;
+        uint24 fee = 500;
 
     function setUp() public override {
          /* 
@@ -128,7 +141,12 @@ contract SipsTest is TestBaseWorkflowV3 {
             ISablierV2ProxyPlugin(0x9bdebF4F9adEB99387f46e4020FBf3dDa885D2b8),
             // Proxy Target
             ISablierV2ProxyTarget(0x297b43aE44660cA7826ef92D8353324C018573Ef),
-            IJBController3_1(_jbController)
+            IJBController3_1(_jbController),
+            // Pool Params
+            USDC,
+            fee,
+            secondsAgo,
+            twapDelta
         );
         vm.label(address(_sips), "Sips Contract");
 
@@ -171,7 +189,7 @@ contract SipsTest is TestBaseWorkflowV3 {
     
         vm.prank(address(123));
         _jbETHPaymentTerminal.distributePayoutsOf(_projectId, 2 ether, 1, address(0x000000000000000000000000000000000000EEEe), 0, "");
-        emit log_uint(address(_sips).balance);
+        emit log_uint(USDC.balanceOf(address(_sips)));
     }
 
     function testFail_allocateExternal() public {
@@ -206,6 +224,10 @@ contract SipsTest is TestBaseWorkflowV3 {
         vm.prank(address(123));
         _sips.deploy();
         _sips.deploy();
+    }
+
+    function testPoolValidity() public {
+        emit log_address(address(_sips.POOL()));
     }
 
 }
