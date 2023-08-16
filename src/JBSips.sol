@@ -3,6 +3,8 @@ pragma solidity ^0.8.20;
 
 import {JBSablier} from "../src/abstract/JBSablier.sol";
 
+import {IJBDirectory} from "@jbx-protocol/juice-contracts-v3/contracts/interfaces/IJBDirectory.sol";
+import {IJBController3_1} from "@jbx-protocol/juice-contracts-v3/contracts/interfaces/IJBController3_1.sol";
 import {IJBSplitAllocator} from "@jbx-protocol/juice-contracts-v3/contracts/interfaces/IJBSplitAllocator.sol";
 import {IJBPaymentTerminal} from "@jbx-protocol/juice-contracts-v3/contracts/interfaces/IJBPaymentTerminal.sol";
 import {IJBDirectory} from "@jbx-protocol/juice-contracts-v3/contracts/interfaces/IJBDirectory.sol";
@@ -15,6 +17,11 @@ import {JBSplitAllocationData} from "@jbx-protocol/juice-contracts-v3/contracts/
 import {JBOperatable} from "@jbx-protocol/juice-contracts-v3/contracts/abstract/JBOperatable.sol";
 import {JBOperations} from "@jbx-protocol/juice-contracts-v3/contracts/libraries/JBOperations.sol";
 
+import {ISablierV2ProxyTarget} from "@sablier/v2-periphery/interfaces/ISablierV2ProxyTarget.sol";
+import {ISablierV2ProxyPlugin} from "@sablier/v2-periphery/interfaces/ISablierV2ProxyPlugin.sol";
+import {ISablierV2LockupDynamic} from "@sablier/v2-core/interfaces/ISablierV2LockupDynamic.sol";
+import {ISablierV2LockupLinear} from "@sablier/v2-core/interfaces/ISablierV2LockupLinear.sol";
+
 import {IPRBProxy, IPRBProxyRegistry} from "@sablier/v2-periphery/types/Proxy.sol";
 
 import {ISablierV2LockupDynamic} from "@sablier/v2-core/interfaces/ISablierV2LockupDynamic.sol";
@@ -22,6 +29,10 @@ import {ISablierV2LockupLinear} from "@sablier/v2-core/interfaces/ISablierV2Lock
 
 import {IERC20} from "@sablier/v2-core/types/Tokens.sol";
 import {IAllowanceTransfer, Permit2Params} from "@sablier/v2-periphery/types/Permit2.sol";
+
+import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+import {IUniswapV3SwapCallback} from "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
+import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 
 import {OracleLibrary} from "@uniswap/v3-periphery/contracts/libraries/OracleLibrary.sol";
 
@@ -53,7 +64,7 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator {
 
     mapping(address => uint256) public idByAddress;
     uint256 public lastCycleNumber;
-    address[] public benefics;
+    /* address[] public benefics; */
 
     //*********************************************************************//
     // -------------------------- constructor ---------------------------- //
@@ -61,13 +72,13 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator {
 
     constructor(
         uint256 _projectId,
-        address _directory,
-        address _operatorStore,
-        address _lockupLinear,
-        address _lockupDynamic,
-        address _proxyPlugin,
-        address _proxyTarget,
-        address _controller
+        IJBDirectory _directory,
+        IJBOperatorStore _operatorStore,
+        ISablierV2LockupLinear _lockupLinear,
+        ISablierV2LockupDynamic _lockupDynamic,
+        ISablierV2ProxyPlugin _proxyPlugin,
+        ISablierV2ProxyTarget _proxyTarget,
+        IJBController3_1 _controller
     )
         JBSablier(
             _projectId,
@@ -97,6 +108,12 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator {
 
         if (_data.projectId != projectId) revert JuiceSips_Unauthorized();
 
+         // Track funding cycles in state var for accounting purposes
+        (JBFundingCycle memory _cycle, ) = controller.currentFundingCycleOf(
+            projectId
+        );
+        lastCycleNumber = _cycle.number;
+
         // Logic for handling ETH payouts
         if (
             directory.isTerminalOf(
@@ -105,21 +122,27 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator {
             )
         ) {}
 
-        // Track funding cycles in state var for accounting purposes
-        (JBFundingCycle memory _cycle, ) = controller.currentFundingCycleOf(
-            projectId
-        );
-        lastCycleNumber = _cycle.number;
+       
 
         /* // Logic for reserved token distribution split (bonus implementation, not the focus rn)
         if (directory.controllerOf(_data.projectId) == msg.sender) {} */
     }
 
-    function batchDeploy() external returns (uint256[] memory streamIds) {
+    /* function batchDeploy() external returns (uint256[] memory streamIds) {
         if (address(proxy) == address(0)) deployProxyAndInstallPlugin();
 
         uint256 batchSize = benefics.length;
-    }
+    } */
+
+    function configureCycleStreams() 
+        external
+        requirePermission(
+            controller.projects().ownerOf(projectId),
+            projectId,
+            JBOperations.SET_SPLITS
+        ) {
+                
+        }
 
     function deploy()
         external
