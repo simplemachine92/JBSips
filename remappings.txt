@@ -2,3 +2,4 @@
 @sablier/v2-periphery=lib/v2-periphery/src
 @prb/math/=lib/prb-math/src/
 @uniswap/v3-core=lib/univ3-core
+@uniswap/v3-periphery=lib/univ3-periph
