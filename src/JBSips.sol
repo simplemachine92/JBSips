@@ -19,15 +19,11 @@ import {JBOperations} from "@jbx-protocol/juice-contracts-v3/contracts/libraries
 
 import {ISablierV2ProxyTarget} from "@sablier/v2-periphery/interfaces/ISablierV2ProxyTarget.sol";
 import {ISablierV2ProxyPlugin} from "@sablier/v2-periphery/interfaces/ISablierV2ProxyPlugin.sol";
-import {ISablierV2LockupDynamic} from "@sablier/v2-core/interfaces/ISablierV2LockupDynamic.sol";
-import {ISablierV2LockupLinear} from "@sablier/v2-core/interfaces/ISablierV2LockupLinear.sol";
+import {ISablierV2LockupDynamic} from "lib/v2-periphery/lib/v2-core/src/interfaces/ISablierV2LockupDynamic.sol";
+import {ISablierV2LockupLinear} from "lib/v2-periphery/lib/v2-core/src/interfaces/ISablierV2LockupLinear.sol";
 
 import {IPRBProxy, IPRBProxyRegistry} from "@sablier/v2-periphery/types/Proxy.sol";
 
-import {ISablierV2LockupDynamic} from "@sablier/v2-core/interfaces/ISablierV2LockupDynamic.sol";
-import {ISablierV2LockupLinear} from "@sablier/v2-core/interfaces/ISablierV2LockupLinear.sol";
-
-import {IERC20} from "@sablier/v2-core/types/Tokens.sol";
 import {IAllowanceTransfer, Permit2Params} from "@sablier/v2-periphery/types/Permit2.sol";
 
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
@@ -35,7 +31,7 @@ import {IUniswapV3SwapCallback} from "@uniswap/v3-core/contracts/interfaces/call
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 
 import {OracleLibrary} from "@uniswap/v3-periphery/contracts/libraries/OracleLibrary.sol";
-import {IERC20} from "@sablier/v2-core/types/Tokens.sol";
+import {IERC20} from "lib/v2-periphery/lib/v2-core/src/types/Tokens.sol";
 
 import {IWETH9} from "./interfaces/external/IWETH9.sol";
 
@@ -102,12 +98,6 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator, IUniswapV3SwapCal
 
     // the twap max deviation acepted (in 10_000th)
     uint256 public twapDelta;
-
-    /* // any ETH left-over in this contract (from swap in the end of liquidity range)
-    mapping(address => uint256) public sweepBalanceOf;
-
-    // running cumulative sum of ETH left-over
-    uint256 public sweepBalance; */
 
     //*********************************************************************//
     // -------------------------- constructor ---------------------------- //
@@ -240,26 +230,6 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator, IUniswapV3SwapCal
     {
         return super.deployProxyAndInstallPlugin();
     }
-
-    /* function withdrawFromStream() external {}
-
-    function configureRecipients()
-        external
-        requirePermission(
-            controller.projects().ownerOf(projectId),
-            projectId,
-            JBOperations.SET_SPLITS
-        )
-    {}
-
-    function cancelStreams()
-        external
-        requirePermission(
-            controller.projects().ownerOf(projectId),
-            projectId,
-            JBOperations.SET_SPLITS
-        )
-    {} */
 
     //*********************************************************************//
     // ---------------------- internal functions ------------------------- //
