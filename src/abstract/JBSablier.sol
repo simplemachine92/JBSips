@@ -11,20 +11,22 @@ import {IJBController3_1} from "@jbx-protocol/juice-contracts-v3/contracts/inter
 
 import {JBOperatable} from "@jbx-protocol/juice-contracts-v3/contracts/abstract/JBOperatable.sol";
 
-import {IPRBProxy, IPRBProxyRegistry} from "@sablier/v2-periphery/types/Proxy.sol";
-import {ISablierV2ProxyTarget} from "@sablier/v2-periphery/interfaces/ISablierV2ProxyTarget.sol";
-import {ISablierV2ProxyPlugin} from "@sablier/v2-periphery/interfaces/ISablierV2ProxyPlugin.sol";
-import {ISablierV2LockupDynamic} from "lib/v2-periphery/lib/v2-core/src/interfaces/ISablierV2LockupDynamic.sol";
-import {ISablierV2LockupLinear} from "lib/v2-periphery/lib/v2-core/src/interfaces/ISablierV2LockupLinear.sol";
+import {IPRBProxy, IPRBProxyRegistry} from "@sablier/v2-periphery/src/types/Proxy.sol";
+import {ISablierV2ProxyTarget} from "@sablier/v2-periphery/src/interfaces/ISablierV2ProxyTarget.sol";
+import {ISablierV2ProxyPlugin} from "@sablier/v2-periphery/src/interfaces/ISablierV2ProxyPlugin.sol";
+import { ISablierV2LockupDynamic } from "@sablier/v2-core/src/interfaces/ISablierV2LockupDynamic.sol";
+import { ISablierV2LockupLinear } from "@sablier/v2-core/src/interfaces/ISablierV2LockupLinear.sol";
 
 import {ERC165, IERC165} from "@openzeppelin/contracts/utils/introspection/ERC165.sol";
-import {IERC20} from "lib/v2-periphery/lib/v2-core/src/types/Tokens.sol";
+import { IERC20 } from "@sablier/v2-core/src/types/Tokens.sol";
 
-import {LockupLinear, LockupDynamic} from "@sablier/v2-core/types/DataTypes.sol";
-import {Batch, Broker} from "@sablier/v2-periphery/types/DataTypes.sol";
-import {ud60x18, ud2x18} from "@sablier/v2-core/types/Math.sol";
+import {LockupLinear, LockupDynamic} from "@sablier/v2-core/src/types/DataTypes.sol";
+import {Batch, Broker} from "@sablier/v2-periphery/src/types/DataTypes.sol";
+import {ud60x18, ud2x18} from "@sablier/v2-core/src/types/Math.sol";
 
-import {IAllowanceTransfer, Permit2Params} from "@sablier/v2-periphery/types/Permit2.sol";
+import {IAllowanceTransfer, Permit2Params} from "@sablier/v2-periphery/src/types/Permit2.sol";
+
+import {AddStreamsData, DeployedStreams} from "../structs/Streams.sol";
 
 abstract contract JBSablier is ERC165, ERC1271 {
         //*********************************************************************//
@@ -109,22 +111,19 @@ abstract contract JBSablier is ERC165, ERC1271 {
     }
 
     function deployStreams(
-        uint256 _total,
-        IERC20 _token,
-        Batch.CreateWithDurations[] calldata _linWithDur, 
-        Batch.CreateWithRange[] calldata _linWithRange, 
-        Batch.CreateWithDeltas[] calldata _dynWithDelta, 
-        Batch.CreateWithMilestones[] calldata _dynWithMiles
-    ) external {
-        if (IERC20(_token).balanceOf(address(this)) < _total ) revert JBSablier_InsufficientBalance();
+        AddStreamsData calldata _data
+    ) internal returns (DeployedStreams memory streams){
+        if (IERC20(_data.token).balanceOf(address(this)) < _data.total ) revert JBSablier_InsufficientBalance();
 
+        Permit2Params memory permit2Params;
+        
         // Set up Permit2. See the full documentation at https://github.com/Uniswap/permit2
         IAllowanceTransfer.PermitDetails memory permitDetails;
-        permitDetails.token = address(_token);
-        permitDetails.amount = uint160(_total);
+        permitDetails.token = address(_data.token);
+        permitDetails.amount = uint160(_data.total);
         permitDetails.expiration = type(uint48).max; // maximum expiration possible
         (,, permitDetails.nonce) =
-            PERMIT2.allowance({ user: address(this), token: address(_token), spender: address(proxy) });
+            PERMIT2.allowance({ user: address(this), token: address(_data.token), spender: address(proxy) });
 
         IAllowanceTransfer.PermitSingle memory permitSingle;
         permitSingle.details = permitDetails;
@@ -132,27 +131,49 @@ abstract contract JBSablier is ERC165, ERC1271 {
         permitSingle.sigDeadline = type(uint48).max; // same deadline as expiration
 
         // Declare the Permit2 params needed by Sablier
-        Permit2Params memory permit2Params;
+        /* Permit2Params memory permit2Params; */
         permit2Params.permitSingle = permitSingle;
         permit2Params.signature = bytes(""); // dummy signature
-
-        /* uint256 batchSize = _linWithDur.length + _linWithRange.length + _dynWithDelta.length + _dynWithMiles.length; */
-
-        if (_linWithDur.length > 0) {
-        // Encode the data for the proxy target call
-        bytes memory data =
-            abi.encodeCall(proxyTarget.batchCreateWithDurations, (lockupLinear, _token, _linWithDur, permit2Params));
-
-        // Create a batch of Lockup Linear streams via the proxy and Sablier's proxy target
-        bytes memory response = proxy.execute(address(proxyTarget), data);
-        uint256[] memory streamIds = abi.decode(response, (uint256[]));
-        }
         
+        DeployedStreams memory streams;
+
+        if (_data.linWithDur.length > 0) {
+            // Encode the data for the proxy target call
+            bytes memory data =
+                abi.encodeCall(proxyTarget.batchCreateWithDurations, (lockupLinear, _data.token, _data.linWithDur, permit2Params));
+
+            // Create a batch of Lockup Linear streams via the proxy and Sablier's proxy target
+            bytes memory response = proxy.execute(address(proxyTarget), data);
+            streams.linearDurStreams = abi.decode(response, (uint256[]));
+        }
+
+        if (_data.linWithRange.length > 0) {
+            bytes memory data =
+                abi.encodeCall(proxyTarget.batchCreateWithRange, (lockupLinear, _data.token, _data.linWithRange, permit2Params));
+
+            // Create a batch of Lockup Linear streams via the proxy and Sablier's proxy target
+            bytes memory response = proxy.execute(address(proxyTarget), data);
+            streams.linearRangeStreams = abi.decode(response, (uint256[]));
+        }
+
+        if (_data.dynWithDelta.length > 0) {
+            bytes memory data =
+                abi.encodeCall(proxyTarget.batchCreateWithDeltas, (lockupDynamic, _data.token, _data.dynWithDelta, permit2Params));
+
+            // Create a batch of Lockup Linear streams via the proxy and Sablier's proxy target
+            bytes memory response = proxy.execute(address(proxyTarget), data);
+            streams.dynDeltaStreams = abi.decode(response, (uint256[]));
+        }
+
+        if (_data.dynWithMiles.length > 0) {
+            bytes memory data =
+                abi.encodeCall(proxyTarget.batchCreateWithMilestones, (lockupDynamic, _data.token, _data.dynWithMiles, permit2Params));
+
+            // Create a batch of Lockup Linear streams via the proxy and Sablier's proxy target
+            bytes memory response = proxy.execute(address(proxyTarget), data);
+            streams.dynMileStreams = abi.decode(response, (uint256[]));
+        }
+
+        return streams;
     }
-
-
-
-    /* function deployStreamBatch() internal returns (uint256 streamIds) {
-
-    } */
 }

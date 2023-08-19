@@ -17,23 +17,25 @@ import {JBSplitAllocationData} from "@jbx-protocol/juice-contracts-v3/contracts/
 import {JBOperatable} from "@jbx-protocol/juice-contracts-v3/contracts/abstract/JBOperatable.sol";
 import {JBOperations} from "@jbx-protocol/juice-contracts-v3/contracts/libraries/JBOperations.sol";
 
-import {ISablierV2ProxyTarget} from "@sablier/v2-periphery/interfaces/ISablierV2ProxyTarget.sol";
-import {ISablierV2ProxyPlugin} from "@sablier/v2-periphery/interfaces/ISablierV2ProxyPlugin.sol";
-import {ISablierV2LockupDynamic} from "lib/v2-periphery/lib/v2-core/src/interfaces/ISablierV2LockupDynamic.sol";
-import {ISablierV2LockupLinear} from "lib/v2-periphery/lib/v2-core/src/interfaces/ISablierV2LockupLinear.sol";
+import {ISablierV2ProxyTarget} from "@sablier/v2-periphery/src/interfaces/ISablierV2ProxyTarget.sol";
+import {ISablierV2ProxyPlugin} from "@sablier/v2-periphery/src/interfaces/ISablierV2ProxyPlugin.sol";
+import { ISablierV2LockupDynamic } from "@sablier/v2-core/src/interfaces/ISablierV2LockupDynamic.sol";
+import { ISablierV2LockupLinear } from "@sablier/v2-core/src/interfaces/ISablierV2LockupLinear.sol";
 
-import {IPRBProxy, IPRBProxyRegistry} from "@sablier/v2-periphery/types/Proxy.sol";
+import {IPRBProxy, IPRBProxyRegistry} from "@sablier/v2-periphery/src/types/Proxy.sol";
 
-import {IAllowanceTransfer, Permit2Params} from "@sablier/v2-periphery/types/Permit2.sol";
+import {IAllowanceTransfer, Permit2Params} from "@sablier/v2-periphery/src/types/Permit2.sol";
 
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import {IUniswapV3SwapCallback} from "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 
 import {OracleLibrary} from "@uniswap/v3-periphery/contracts/libraries/OracleLibrary.sol";
-import {IERC20} from "lib/v2-periphery/lib/v2-core/src/types/Tokens.sol";
+import { IERC20 } from "@sablier/v2-core/src/types/Tokens.sol";
 
 import {IWETH9} from "./interfaces/external/IWETH9.sol";
+
+import {AddStreamsData, DeployedStreams} from "./structs/Streams.sol";
 
 /**
  * @custom:benediction DEVS BENEDICAT ET PROTEGAT CONTRACTVS MEAM
@@ -90,7 +92,8 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator, IUniswapV3SwapCal
     // --------------------- public stored properties -------------------- //
     //*********************************************************************//
 
-    mapping(uint256 cycleNumber => uint256 balance) public cycleTokensReceived;
+    mapping(uint256 cycleNumber => AddStreamsData) public streamsToDeploy;
+    mapping(uint256 cycleNumber => DeployedStreams) public streamsByCycle;
     uint256 public lastCycleNumber;
 
     // the timeframe to use for the pool twap (from secondAgo to now)
@@ -165,23 +168,23 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator, IUniswapV3SwapCal
 
         if (_data.projectId != projectId) revert JuiceSips_Unauthorized();
 
-         // Track funding cycles in state var for accounting purposes
-        (JBFundingCycle memory _cycle, ) = controller.currentFundingCycleOf(
-            projectId
-        );
-        lastCycleNumber = _cycle.number;
-
-        uint256 quote = _getQuote(msg.value);
-
-        uint256 tokensFromSwap = _swap(int256(msg.value), quote);
-
         // Logic for handling ETH payouts
         if (
             directory.isTerminalOf(
                 _data.projectId,
                 IJBPaymentTerminal(msg.sender)
             )
-        ) {}
+        ) {
+             // Track funding cycles in state var for accounting purposes
+            (JBFundingCycle memory _cycle, ) = controller.currentFundingCycleOf(
+                projectId
+            );
+            lastCycleNumber = _cycle.number;
+
+            uint256 quote = _getQuote(msg.value);
+
+            uint256 tokensFromSwap = _swap(int256(msg.value), quote);
+        }
     }
 
     /**
