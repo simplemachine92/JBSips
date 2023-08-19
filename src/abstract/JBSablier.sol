@@ -14,11 +14,11 @@ import {JBOperatable} from "@jbx-protocol/juice-contracts-v3/contracts/abstract/
 import {IPRBProxy, IPRBProxyRegistry} from "@sablier/v2-periphery/src/types/Proxy.sol";
 import {ISablierV2ProxyTarget} from "@sablier/v2-periphery/src/interfaces/ISablierV2ProxyTarget.sol";
 import {ISablierV2ProxyPlugin} from "@sablier/v2-periphery/src/interfaces/ISablierV2ProxyPlugin.sol";
-import { ISablierV2LockupDynamic } from "@sablier/v2-core/src/interfaces/ISablierV2LockupDynamic.sol";
-import { ISablierV2LockupLinear } from "@sablier/v2-core/src/interfaces/ISablierV2LockupLinear.sol";
+import {ISablierV2LockupDynamic} from "lib/v2-periphery/lib/v2-core/src/interfaces/ISablierV2LockupDynamic.sol";
+import {ISablierV2LockupLinear} from "lib/v2-periphery/lib/v2-core/src/interfaces/ISablierV2LockupLinear.sol";
 
 import {ERC165, IERC165} from "@openzeppelin/contracts/utils/introspection/ERC165.sol";
-import { IERC20 } from "@sablier/v2-core/src/types/Tokens.sol";
+import {IERC20} from "lib/v2-periphery/lib/v2-core/src/types/Tokens.sol";
 
 import {LockupLinear, LockupDynamic} from "@sablier/v2-core/src/types/DataTypes.sol";
 import {Batch, Broker} from "@sablier/v2-periphery/src/types/DataTypes.sol";
