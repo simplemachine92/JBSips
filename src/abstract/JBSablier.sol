@@ -43,7 +43,7 @@ abstract contract JBSablier is ERC165, ERC1271 {
     IJBDirectory public directory;
     IJBController3_1 public controller;
 
-    IPRBProxy public proxy;
+    IPRBProxy internal proxy;
     ISablierV2LockupLinear public immutable lockupLinear;
     ISablierV2LockupDynamic public immutable lockupDynamic;
     ISablierV2ProxyTarget public proxyTarget;
@@ -96,7 +96,7 @@ abstract contract JBSablier is ERC165, ERC1271 {
     /// @notice Deploys a PRB proxy and plugin that returns tokens to this address
     /// @dev See https://docs.sablier.com/contracts/v2/guides/proxy-architecture/deploy
     /// @return proxy {IPRBProxy} proxy address
-    function deployProxyAndInstallPlugin() internal returns (IPRBProxy proxy) {
+    function deployProxyAndInstallPlugin() external returns (IPRBProxy proxy) {
         // Get the proxy for this contract
         proxy = PROXY_REGISTRY.getProxy({user: address(this)});
         if (address(proxy) == address(0)) {
@@ -110,41 +110,28 @@ abstract contract JBSablier is ERC165, ERC1271 {
         }
     }
 
+    /// @notice Deploys streams for each *stream type* defined by user
+    /// @dev See https://docs.sablier.com/contracts/v2/guides/proxy-architecture/batch-stream
+    /// @return streams {DeployedStreams} a struct that carries the cycleNumber, and streamIds deployed via Sablier v2
     function deployStreams(
         AddStreamsData memory _data
     ) internal returns (DeployedStreams memory streams){
         if (IERC20(_data.token).balanceOf(address(this)) < _data.total ) revert JBSablier_InsufficientBalance();
 
-        IPRBProxy proxy = PROXY_REGISTRY.getProxy({ user: address(this) });
+        // Get the proxy for this contract
+        IPRBProxy proxy = PROXY_REGISTRY.getProxy({user: address(this)});
 
-        _data.token.approve({ spender: address(PERMIT2), amount: type(uint256).max });
+        // Approve tokens for transfer
+        _data.token.approve({ spender: address(PERMIT2), amount: type(uint160).max });
         
+        // Returned after execution for accounting
         DeployedStreams memory streams;
 
+        // Encode and proxy.execute with data for the proxy target call if user defined each *stream type*
         if (_data.linWithDur.length > 0) {
-            Permit2Params memory permit2Params;
-        
-            // Set up Permit2. See the full documentation at https://github.com/Uniswap/permit2
-            IAllowanceTransfer.PermitDetails memory permitDetails;
-            permitDetails.token = address(_data.token);
-            permitDetails.amount = type(uint160).max; /* uint160(_data.total); */
-            permitDetails.expiration = type(uint48).max; // maximum expiration possible
-            (,, permitDetails.nonce) =
-                PERMIT2.allowance({ user: address(this), token: address(_data.token), spender: address(proxy) });
 
-            IAllowanceTransfer.PermitSingle memory permitSingle;
-            permitSingle.details = permitDetails;
-            permitSingle.spender = address(proxy); // the proxy will be the spender
-            permitSingle.sigDeadline = type(uint48).max; // same deadline as expiration
-
-            // Declare the Permit2 params needed by Sablier
-            /* Permit2Params memory permit2Params; */
-            permit2Params.permitSingle = permitSingle;
-            permit2Params.signature = bytes(""); // dummy signature
-
-            // Encode the data for the proxy target call
             bytes memory data =
-                abi.encodeCall(proxyTarget.batchCreateWithDurations, (lockupLinear, _data.token, _data.linWithDur, permit2Params));
+                abi.encodeCall(proxyTarget.batchCreateWithDurations, (lockupLinear, _data.token, _data.linWithDur, issueNewPermit(_data.token, proxy)));
 
             // Create a batch of Lockup Linear streams via the proxy and Sablier's proxy target
             bytes memory response = proxy.execute(address(proxyTarget), data);
@@ -152,92 +139,59 @@ abstract contract JBSablier is ERC165, ERC1271 {
         }
 
         if (_data.linWithRange.length > 0) {
-            Permit2Params memory permit2Params;
-        
-            // Set up Permit2. See the full documentation at https://github.com/Uniswap/permit2
-            IAllowanceTransfer.PermitDetails memory permitDetails;
-            permitDetails.token = address(_data.token);
-            permitDetails.amount = type(uint160).max; /* uint160(_data.total); */
-            permitDetails.expiration = type(uint48).max; // maximum expiration possible
-            (,, permitDetails.nonce) =
-                PERMIT2.allowance({ user: address(this), token: address(_data.token), spender: address(proxy) });
-
-            IAllowanceTransfer.PermitSingle memory permitSingle;
-            permitSingle.details = permitDetails;
-            permitSingle.spender = address(proxy); // the proxy will be the spender
-            permitSingle.sigDeadline = type(uint48).max; // same deadline as expiration
-
-            // Declare the Permit2 params needed by Sablier
-            /* Permit2Params memory permit2Params; */
-            permit2Params.permitSingle = permitSingle;
-            permit2Params.signature = bytes(""); // dummy signature
 
             bytes memory data =
-                abi.encodeCall(proxyTarget.batchCreateWithRange, (lockupLinear, _data.token, _data.linWithRange, permit2Params));
+                abi.encodeCall(proxyTarget.batchCreateWithRange, (lockupLinear, _data.token, _data.linWithRange, issueNewPermit(_data.token, proxy)));
 
-            // Create a batch of Lockup Linear streams via the proxy and Sablier's proxy target
             bytes memory response = proxy.execute(address(proxyTarget), data);
             streams.linearRangeStreams = abi.decode(response, (uint256[]));
         }
 
         if (_data.dynWithDelta.length > 0) {
-            Permit2Params memory permit2Params;
-        
-            // Set up Permit2. See the full documentation at https://github.com/Uniswap/permit2
-            IAllowanceTransfer.PermitDetails memory permitDetails;
-            permitDetails.token = address(_data.token);
-            permitDetails.amount = type(uint160).max; /* uint160(_data.total); */
-            permitDetails.expiration = type(uint48).max; // maximum expiration possible
-            (,, permitDetails.nonce) =
-                PERMIT2.allowance({ user: address(this), token: address(_data.token), spender: address(proxy) });
-
-            IAllowanceTransfer.PermitSingle memory permitSingle;
-            permitSingle.details = permitDetails;
-            permitSingle.spender = address(proxy); // the proxy will be the spender
-            permitSingle.sigDeadline = type(uint48).max; // same deadline as expiration
-
-            // Declare the Permit2 params needed by Sablier
-            /* Permit2Params memory permit2Params; */
-            permit2Params.permitSingle = permitSingle;
-            permit2Params.signature = bytes(""); // dummy signature
 
             bytes memory data =
-                abi.encodeCall(proxyTarget.batchCreateWithDeltas, (lockupDynamic, _data.token, _data.dynWithDelta, permit2Params));
+                abi.encodeCall(proxyTarget.batchCreateWithDeltas, (lockupDynamic, _data.token, _data.dynWithDelta, issueNewPermit(_data.token, proxy)));
 
-            // Create a batch of Lockup Linear streams via the proxy and Sablier's proxy target
             bytes memory response = proxy.execute(address(proxyTarget), data);
             streams.dynDeltaStreams = abi.decode(response, (uint256[]));
         }
 
         if (_data.dynWithMiles.length > 0) {
-            Permit2Params memory permit2Params;
-        
-            // Set up Permit2. See the full documentation at https://github.com/Uniswap/permit2
-            IAllowanceTransfer.PermitDetails memory permitDetails;
-            permitDetails.token = address(_data.token);
-            permitDetails.amount = type(uint160).max; /* uint160(_data.total); */
-            permitDetails.expiration = type(uint48).max; // maximum expiration possible
-            (,, permitDetails.nonce) =
-                PERMIT2.allowance({ user: address(this), token: address(_data.token), spender: address(proxy) });
-
-            IAllowanceTransfer.PermitSingle memory permitSingle;
-            permitSingle.details = permitDetails;
-            permitSingle.spender = address(proxy); // the proxy will be the spender
-            permitSingle.sigDeadline = type(uint48).max; // same deadline as expiration
-
-            // Declare the Permit2 params needed by Sablier
-            /* Permit2Params memory permit2Params; */
-            permit2Params.permitSingle = permitSingle;
-            permit2Params.signature = bytes(""); // dummy signature
             
             bytes memory data =
-                abi.encodeCall(proxyTarget.batchCreateWithMilestones, (lockupDynamic, _data.token, _data.dynWithMiles, permit2Params));
+                abi.encodeCall(proxyTarget.batchCreateWithMilestones, (lockupDynamic, _data.token, _data.dynWithMiles, issueNewPermit(_data.token, proxy)));
 
-            // Create a batch of Lockup Linear streams via the proxy and Sablier's proxy target
             bytes memory response = proxy.execute(address(proxyTarget), data);
             streams.dynMileStreams = abi.decode(response, (uint256[]));
         }
 
         return streams;
+    }
+
+    /// @notice Issues distinct permits for deploying batches of streams via PRBProxy/Permit2
+    /// @dev See https://docs.sablier.com/contracts/v2/guides/proxy-architecture/overview
+    /// @param _token Our token as an IERC20
+    /// @param _proxy Our proxy assigned to this contract
+    /// @return Permit2Params The new permit params, which should include a new nonce, as this is called in succession of a proxy.execute()
+    function issueNewPermit(IERC20 _token, IPRBProxy _proxy) private view returns (Permit2Params memory) {
+        // Set up Permit2. See the full documentation at https://github.com/Uniswap/permit2
+        IAllowanceTransfer.PermitDetails memory permitDetails;
+        permitDetails.token = address(_token);
+        permitDetails.amount = type(uint160).max; /* uint160(_data.total); */
+        permitDetails.expiration = type(uint48).max; // maximum expiration possible
+        (,, permitDetails.nonce) =
+            PERMIT2.allowance({ user: address(this), token: address(_token), spender: address(_proxy) });
+
+        IAllowanceTransfer.PermitSingle memory permitSingle;
+        permitSingle.details = permitDetails;
+        permitSingle.spender = address(_proxy); // the proxy will be the spender
+        permitSingle.sigDeadline = type(uint48).max; // same deadline as expiration
+
+        // Declare the Permit2 params needed by Sablier
+        Permit2Params memory permit2Params;
+        permit2Params.permitSingle = permitSingle;
+        permit2Params.signature = bytes(""); // dummy signature
+
+        return permit2Params;
     }
 }

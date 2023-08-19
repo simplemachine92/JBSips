@@ -190,7 +190,7 @@ contract SipsTest is TestBaseWorkflowV3 {
     function testPayoutStreamFlow() public {
         // first deploy our proxy
         vm.prank(address(123));
-        IPRBProxy _proxy = _sips.deploy();
+        IPRBProxy _proxy = _sips.deployProxyAndInstallPlugin();
 
         // Declare the first stream in the batch
         Batch.CreateWithDurations memory stream0;
@@ -303,13 +303,13 @@ contract SipsTest is TestBaseWorkflowV3 {
 
     function testDeployProxyAndPI() public {
         vm.prank(address(123));
-        _sips.deploy();
+        _sips.deployProxyAndInstallPlugin();
     }
 
     function testFail_DoubleDeploy() public {
         vm.prank(address(123));
-        _sips.deploy();
-        _sips.deploy();
+        _sips.deployProxyAndInstallPlugin();
+        _sips.deployProxyAndInstallPlugin();
     }
 
     function testPoolValidity() public {

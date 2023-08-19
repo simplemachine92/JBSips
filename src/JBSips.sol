@@ -236,7 +236,7 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator, IUniswapV3SwapCal
         WETH.transfer(address(POOL), _amountToSendToPool);
     }
 
-    function deploy()
+    /* function deploy()
         external
         requirePermission(
             controller.projects().ownerOf(projectId),
@@ -247,7 +247,7 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator, IUniswapV3SwapCal
     {
         return super.deployProxyAndInstallPlugin();
     }
-
+ */
     //*********************************************************************//
     // ---------------------- internal functions ------------------------- //
     //*********************************************************************//
