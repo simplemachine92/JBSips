@@ -102,6 +102,8 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator, IUniswapV3SwapCal
     // the twap max deviation acepted (in 10_000th)
     uint256 public twapDelta;
 
+    bool public streamOnPayout;
+
     //*********************************************************************//
     // -------------------------- constructor ---------------------------- //
     //*********************************************************************//
@@ -154,6 +156,22 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator, IUniswapV3SwapCal
         twapDelta = _twapDelta;
     }
 
+    function setCurrentCycleStreams(AddStreamsData calldata _streams) 
+        external
+        requirePermission(
+            controller.projects().ownerOf(projectId),
+            projectId,
+            JBOperations.SET_SPLITS
+        ) {
+             // Track funding cycles in state var for accounting purposes
+            (JBFundingCycle memory _cycle, ) = controller.currentFundingCycleOf(
+                projectId
+            );
+            uint256 cycleNumber = _cycle.number;
+
+            streamsToDeploy[cycleNumber] = _streams;
+        }
+
     /// @notice Called by a project's payout (JBTerminal) or reserved token distribution split (JBController)
     /// @dev See https://docs.juicebox.money/dev/learn/glossary/split-allocator/
     /// @param _data See https://docs.juicebox.money/dev/api/data-structures/jbsplitallocationdata/
@@ -184,6 +202,12 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator, IUniswapV3SwapCal
             uint256 quote = _getQuote(msg.value);
 
             uint256 tokensFromSwap = _swap(int256(msg.value), quote);
+
+            AddStreamsData memory _streamsTo = streamsToDeploy[lastCycleNumber];
+
+            DeployedStreams memory streams = super.deployStreams(_streamsTo);
+
+            streamsByCycle[lastCycleNumber] = streams;
         }
     }
 
@@ -211,16 +235,6 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator, IUniswapV3SwapCal
         WETH.deposit{value: _amountToSendToPool}();
         WETH.transfer(address(POOL), _amountToSendToPool);
     }
-
-    function configureCycleStreams() 
-        external
-        requirePermission(
-            controller.projects().ownerOf(projectId),
-            projectId,
-            JBOperations.SET_SPLITS
-        ) {
-                
-        }
 
     function deploy()
         external

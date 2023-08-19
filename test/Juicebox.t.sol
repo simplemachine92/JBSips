@@ -13,6 +13,9 @@ import {ISablierV2LockupDynamic} from "lib/v2-periphery/lib/v2-core/src/interfac
 import {ISablierV2LockupLinear} from "lib/v2-periphery/lib/v2-core/src/interfaces/ISablierV2LockupLinear.sol";
 import { ISablierV2ProxyPlugin } from "@sablier/v2-periphery/src/interfaces/ISablierV2ProxyPlugin.sol";
 import { ISablierV2ProxyTarget } from "@sablier/v2-periphery/src/interfaces/ISablierV2ProxyTarget.sol";
+import {LockupLinear, LockupDynamic} from "@sablier/v2-periphery/src/types/DataTypes.sol";
+import {Batch, Broker} from "@sablier/v2-periphery/src/types/DataTypes.sol";
+import { ud2x18, ud60x18 } from "@sablier/v2-core/src/types/Math.sol";
 
 import {IJBDelegatesRegistry} from "@jbx-protocol/juice-delegates-registry/src/interfaces/IJBDelegatesRegistry.sol";
 import {IJBFundingCycleBallot} from "@jbx-protocol/juice-contracts-v3/contracts/interfaces/IJBFundingCycleBallot.sol";
@@ -26,6 +29,9 @@ import {IWETH9} from "../src/interfaces/external/IWETH9.sol";
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import {IUniswapV3SwapCallback} from "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
+
+import {AddStreamsData, DeployedStreams} from "../src/structs/Streams.sol";
+import {IPRBProxy, IPRBProxyRegistry} from "@sablier/v2-periphery/src/types/Proxy.sol";
 
 import {Test, console2} from "forge-std/Test.sol";
 
@@ -179,6 +185,86 @@ contract SipsTest is TestBaseWorkflowV3 {
             ""
         );
         
+    }
+
+    function testPayoutStreamFlow() public {
+        // first deploy our proxy
+        vm.prank(address(123));
+        IPRBProxy _proxy = _sips.deploy();
+
+        // Declare the first stream in the batch
+        Batch.CreateWithDurations memory stream0;
+        stream0.sender = address(_proxy); // The sender will be able to cancel the stream
+        stream0.recipient = address(0xcafe); // The recipient of the streamed assets
+        stream0.totalAmount = uint128(800000000); // The total amount of each stream, inclusive of all fees
+        stream0.cancelable = true; // Whether the stream will be cancelable or not
+        stream0.durations = LockupLinear.Durations({
+            cliff: 4 weeks, // Assets will be unlocked only after 4 weeks
+            total: 52 weeks // Setting a total duration of ~1 year
+         });
+        stream0.broker = Broker(address(0), ud60x18(0)); // Optional parameter left undefined
+
+        Batch.CreateWithDurations[] memory durBatch = new Batch.CreateWithDurations[](1);
+
+        durBatch[0] = stream0;
+
+                // Declare the params struct
+        Batch.CreateWithMilestones memory stream1;
+
+        // Declare the second stream
+        Batch.CreateWithMilestones[] memory mileBatch = new Batch.CreateWithMilestones[](1);
+
+        // Declare the function parameters
+        stream1.sender = address(_proxy); // The sender will be able to cancel the stream
+        stream1.recipient = address(0xcafe2); // The recipient of the streamed assets
+        stream1.totalAmount = uint128(800000000); // Total amount is the amount inclusive of all fees
+        /* stream1.asset = USDC; // The streaming asset */
+        stream1.cancelable = true; // Whether the stream will be cancelable or not
+        /* stream1.startTime = uint40(block.timestamp); */
+        stream1.broker = Broker(address(0), ud60x18(0)); // Optional parameter left undefined
+
+        // Declare some dummy segments
+        stream1.segments = new LockupDynamic.Segment[](2);
+        stream1.segments[0] = LockupDynamic.Segment({
+            amount: uint128(400000000),
+            exponent: ud2x18(1e18),
+            milestone: uint40(block.timestamp + 4 weeks)
+        });
+        stream1.segments[1] = (
+            LockupDynamic.Segment({
+                amount: uint128(400000000),
+                exponent: ud2x18(3.14e18),
+                milestone: uint40(block.timestamp + 52 weeks)
+            })
+        );
+
+        mileBatch[0] = stream1;
+
+         Batch.CreateWithRange[] memory _range = new Batch.CreateWithRange[](0);
+         Batch.CreateWithDeltas[] memory _deltas = new Batch.CreateWithDeltas[](0);
+
+         AddStreamsData memory _data = AddStreamsData({
+            total: 3200000000,
+            token: USDC,
+            linWithDur: durBatch,
+            linWithRange: _range,
+            dynWithDelta: _deltas,
+            dynWithMiles: mileBatch
+         });
+
+        vm.prank(address(123));
+        _sips.setCurrentCycleStreams(_data);
+
+        // Load our project with some eth
+        vm.deal(address(123), 20 ether);
+        vm.prank(address(123));
+        _jbETHPaymentTerminal.pay{value: 10 ether}(_projectId, 10 ether, address(0x000000000000000000000000000000000000EEEe), address(123), 0, false, "", "");
+
+        // distribute payout
+        vm.prank(address(123));
+        _jbETHPaymentTerminal.distributePayoutsOf(_projectId, 2 ether, 1, address(0x000000000000000000000000000000000000EEEe), 0, "");
+        emit log_uint(USDC.balanceOf(address(_sips)));
+
     }
 
     function testPayout() public {

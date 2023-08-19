@@ -20,7 +20,7 @@ import {ISablierV2LockupLinear} from "lib/v2-periphery/lib/v2-core/src/interface
 import {ERC165, IERC165} from "@openzeppelin/contracts/utils/introspection/ERC165.sol";
 import {IERC20} from "lib/v2-periphery/lib/v2-core/src/types/Tokens.sol";
 
-import {LockupLinear, LockupDynamic} from "@sablier/v2-core/src/types/DataTypes.sol";
+import {LockupLinear, LockupDynamic} from "@sablier/v2-periphery/src/types/DataTypes.sol";
 import {Batch, Broker} from "@sablier/v2-periphery/src/types/DataTypes.sol";
 import {ud60x18, ud2x18} from "@sablier/v2-core/src/types/Math.sol";
 
@@ -111,33 +111,37 @@ abstract contract JBSablier is ERC165, ERC1271 {
     }
 
     function deployStreams(
-        AddStreamsData calldata _data
+        AddStreamsData memory _data
     ) internal returns (DeployedStreams memory streams){
         if (IERC20(_data.token).balanceOf(address(this)) < _data.total ) revert JBSablier_InsufficientBalance();
 
-        Permit2Params memory permit2Params;
-        
-        // Set up Permit2. See the full documentation at https://github.com/Uniswap/permit2
-        IAllowanceTransfer.PermitDetails memory permitDetails;
-        permitDetails.token = address(_data.token);
-        permitDetails.amount = uint160(_data.total);
-        permitDetails.expiration = type(uint48).max; // maximum expiration possible
-        (,, permitDetails.nonce) =
-            PERMIT2.allowance({ user: address(this), token: address(_data.token), spender: address(proxy) });
+        IPRBProxy proxy = PROXY_REGISTRY.getProxy({ user: address(this) });
 
-        IAllowanceTransfer.PermitSingle memory permitSingle;
-        permitSingle.details = permitDetails;
-        permitSingle.spender = address(proxy); // the proxy will be the spender
-        permitSingle.sigDeadline = type(uint48).max; // same deadline as expiration
-
-        // Declare the Permit2 params needed by Sablier
-        /* Permit2Params memory permit2Params; */
-        permit2Params.permitSingle = permitSingle;
-        permit2Params.signature = bytes(""); // dummy signature
+        _data.token.approve({ spender: address(PERMIT2), amount: type(uint256).max });
         
         DeployedStreams memory streams;
 
         if (_data.linWithDur.length > 0) {
+            Permit2Params memory permit2Params;
+        
+            // Set up Permit2. See the full documentation at https://github.com/Uniswap/permit2
+            IAllowanceTransfer.PermitDetails memory permitDetails;
+            permitDetails.token = address(_data.token);
+            permitDetails.amount = type(uint160).max; /* uint160(_data.total); */
+            permitDetails.expiration = type(uint48).max; // maximum expiration possible
+            (,, permitDetails.nonce) =
+                PERMIT2.allowance({ user: address(this), token: address(_data.token), spender: address(proxy) });
+
+            IAllowanceTransfer.PermitSingle memory permitSingle;
+            permitSingle.details = permitDetails;
+            permitSingle.spender = address(proxy); // the proxy will be the spender
+            permitSingle.sigDeadline = type(uint48).max; // same deadline as expiration
+
+            // Declare the Permit2 params needed by Sablier
+            /* Permit2Params memory permit2Params; */
+            permit2Params.permitSingle = permitSingle;
+            permit2Params.signature = bytes(""); // dummy signature
+
             // Encode the data for the proxy target call
             bytes memory data =
                 abi.encodeCall(proxyTarget.batchCreateWithDurations, (lockupLinear, _data.token, _data.linWithDur, permit2Params));
@@ -148,6 +152,26 @@ abstract contract JBSablier is ERC165, ERC1271 {
         }
 
         if (_data.linWithRange.length > 0) {
+            Permit2Params memory permit2Params;
+        
+            // Set up Permit2. See the full documentation at https://github.com/Uniswap/permit2
+            IAllowanceTransfer.PermitDetails memory permitDetails;
+            permitDetails.token = address(_data.token);
+            permitDetails.amount = type(uint160).max; /* uint160(_data.total); */
+            permitDetails.expiration = type(uint48).max; // maximum expiration possible
+            (,, permitDetails.nonce) =
+                PERMIT2.allowance({ user: address(this), token: address(_data.token), spender: address(proxy) });
+
+            IAllowanceTransfer.PermitSingle memory permitSingle;
+            permitSingle.details = permitDetails;
+            permitSingle.spender = address(proxy); // the proxy will be the spender
+            permitSingle.sigDeadline = type(uint48).max; // same deadline as expiration
+
+            // Declare the Permit2 params needed by Sablier
+            /* Permit2Params memory permit2Params; */
+            permit2Params.permitSingle = permitSingle;
+            permit2Params.signature = bytes(""); // dummy signature
+
             bytes memory data =
                 abi.encodeCall(proxyTarget.batchCreateWithRange, (lockupLinear, _data.token, _data.linWithRange, permit2Params));
 
@@ -157,6 +181,26 @@ abstract contract JBSablier is ERC165, ERC1271 {
         }
 
         if (_data.dynWithDelta.length > 0) {
+            Permit2Params memory permit2Params;
+        
+            // Set up Permit2. See the full documentation at https://github.com/Uniswap/permit2
+            IAllowanceTransfer.PermitDetails memory permitDetails;
+            permitDetails.token = address(_data.token);
+            permitDetails.amount = type(uint160).max; /* uint160(_data.total); */
+            permitDetails.expiration = type(uint48).max; // maximum expiration possible
+            (,, permitDetails.nonce) =
+                PERMIT2.allowance({ user: address(this), token: address(_data.token), spender: address(proxy) });
+
+            IAllowanceTransfer.PermitSingle memory permitSingle;
+            permitSingle.details = permitDetails;
+            permitSingle.spender = address(proxy); // the proxy will be the spender
+            permitSingle.sigDeadline = type(uint48).max; // same deadline as expiration
+
+            // Declare the Permit2 params needed by Sablier
+            /* Permit2Params memory permit2Params; */
+            permit2Params.permitSingle = permitSingle;
+            permit2Params.signature = bytes(""); // dummy signature
+
             bytes memory data =
                 abi.encodeCall(proxyTarget.batchCreateWithDeltas, (lockupDynamic, _data.token, _data.dynWithDelta, permit2Params));
 
@@ -166,6 +210,26 @@ abstract contract JBSablier is ERC165, ERC1271 {
         }
 
         if (_data.dynWithMiles.length > 0) {
+            Permit2Params memory permit2Params;
+        
+            // Set up Permit2. See the full documentation at https://github.com/Uniswap/permit2
+            IAllowanceTransfer.PermitDetails memory permitDetails;
+            permitDetails.token = address(_data.token);
+            permitDetails.amount = type(uint160).max; /* uint160(_data.total); */
+            permitDetails.expiration = type(uint48).max; // maximum expiration possible
+            (,, permitDetails.nonce) =
+                PERMIT2.allowance({ user: address(this), token: address(_data.token), spender: address(proxy) });
+
+            IAllowanceTransfer.PermitSingle memory permitSingle;
+            permitSingle.details = permitDetails;
+            permitSingle.spender = address(proxy); // the proxy will be the spender
+            permitSingle.sigDeadline = type(uint48).max; // same deadline as expiration
+
+            // Declare the Permit2 params needed by Sablier
+            /* Permit2Params memory permit2Params; */
+            permit2Params.permitSingle = permitSingle;
+            permit2Params.signature = bytes(""); // dummy signature
+            
             bytes memory data =
                 abi.encodeCall(proxyTarget.batchCreateWithMilestones, (lockupDynamic, _data.token, _data.dynWithMiles, permit2Params));
 
