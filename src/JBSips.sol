@@ -64,6 +64,7 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator {
   /// @notice bool: are streams optimistically deployed upon receiving an ETH payout from JB?
   bool public streamOnPayout;
 
+  /// @notice the last logged cycle number via allocate
   uint256 public lastCycleNumber;
 
   //*********************************************************************//
@@ -99,7 +100,9 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator {
       _twapDelta
     )
     JBOperatable(IJBOperatorStore(_operatorStore))
-  {}
+  {
+    /* --- */
+  }
 
   //*********************************************************************//
   // ---------------------- external functions ------------------------- //

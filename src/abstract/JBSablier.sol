@@ -2,6 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {ERC1271} from './ERC1271.sol';
+import {AddStreamsData, DeployedStreams} from '../structs/Streams.sol';
 
 import {IJBSplitAllocator} from '@jbx-protocol/juice-contracts-v3/contracts/interfaces/IJBSplitAllocator.sol';
 import {IJBPaymentTerminal} from '@jbx-protocol/juice-contracts-v3/contracts/interfaces/IJBPaymentTerminal.sol';
@@ -9,24 +10,17 @@ import {IJBDirectory} from '@jbx-protocol/juice-contracts-v3/contracts/interface
 import {IJBOperatorStore} from '@jbx-protocol/juice-contracts-v3/contracts/interfaces/IJBOperatorStore.sol';
 import {IJBController3_1} from '@jbx-protocol/juice-contracts-v3/contracts/interfaces/IJBController3_1.sol';
 
-import {JBOperatable} from '@jbx-protocol/juice-contracts-v3/contracts/abstract/JBOperatable.sol';
-
 import {IPRBProxy, IPRBProxyRegistry} from '@sablier/v2-periphery/src/types/Proxy.sol';
 import {ISablierV2ProxyTarget} from '@sablier/v2-periphery/src/interfaces/ISablierV2ProxyTarget.sol';
 import {ISablierV2ProxyPlugin} from '@sablier/v2-periphery/src/interfaces/ISablierV2ProxyPlugin.sol';
 import {ISablierV2LockupDynamic} from 'lib/v2-periphery/lib/v2-core/src/interfaces/ISablierV2LockupDynamic.sol';
 import {ISablierV2LockupLinear} from 'lib/v2-periphery/lib/v2-core/src/interfaces/ISablierV2LockupLinear.sol';
 
-import {ERC165, IERC165} from '@openzeppelin/contracts/utils/introspection/ERC165.sol';
+import {ERC165} from '@openzeppelin/contracts/utils/introspection/ERC165.sol';
 import {IERC20} from 'lib/v2-periphery/lib/v2-core/src/types/Tokens.sol';
 
 import {LockupLinear, LockupDynamic} from '@sablier/v2-periphery/src/types/DataTypes.sol';
-import {Batch, Broker} from '@sablier/v2-periphery/src/types/DataTypes.sol';
-import {ud60x18, ud2x18} from '@sablier/v2-core/src/types/Math.sol';
-
 import {IAllowanceTransfer, Permit2Params} from '@sablier/v2-periphery/src/types/Permit2.sol';
-
-import {AddStreamsData, DeployedStreams} from '../structs/Streams.sol';
 
 import {IUniswapV3Pool} from '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
 import {IUniswapV3SwapCallback} from '@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol';
@@ -65,7 +59,7 @@ abstract contract JBSablier is ERC165, ERC1271, IUniswapV3SwapCallback {
 
   /// @dev Includes stateless scripts for deploying streams.
   /// see https://docs.sablier.com/contracts/v2/reference/periphery/interfaces/interface.ISablierV2ProxyTarget
-  ISablierV2ProxyTarget public proxyTarget;
+  ISablierV2ProxyTarget public immutable proxyTarget;
 
   /// @dev Forwards refunded assets to the proxy owner (this contract) when a stream is cancelled.
   /// see https://docs.sablier.com/contracts/v2/reference/periphery/interfaces/interface.ISablierV2ProxyPlugin
@@ -86,7 +80,7 @@ abstract contract JBSablier is ERC165, ERC1271, IUniswapV3SwapCallback {
   /**
    * @notice The WETH contract
    */
-  IWETH9 public immutable WETH = IWETH9(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
+  IWETH9 public constant WETH = IWETH9(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
 
   /**
    * @notice The Uniswap V3 Factory contract
@@ -99,15 +93,6 @@ abstract contract JBSablier is ERC165, ERC1271, IUniswapV3SwapCallback {
   /// @notice the twap max deviation acepted (in 10_000th)
   uint256 public twapDelta;
 
-  //*********************************************************************//
-  // --------------------- private constant properties ----------------- //
-  //*********************************************************************//
-
-  /**
-   * @notice The unit of the max slippage (expressed in 1/10000th)
-   */
-  uint256 constant SLIPPAGE_DENOMINATOR = 10000;
-
   /**
    * @notice Address project token < address terminal token ?
    */
@@ -119,6 +104,15 @@ abstract contract JBSablier is ERC165, ERC1271, IUniswapV3SwapCallback {
    * @dev In this context, this is the token to be streamed
    */
   address immutable TARGET_TOKEN;
+
+  //*********************************************************************//
+  // --------------------- private constant properties ----------------- //
+  //*********************************************************************//
+
+  /**
+   * @notice The unit of the max slippage (expressed in 1/10000th)
+   */
+  uint256 constant SLIPPAGE_DENOMINATOR = 10000;
 
   //*********************************************************************//
   // -------------------------- constructor ---------------------------- //
@@ -165,7 +159,6 @@ abstract contract JBSablier is ERC165, ERC1271, IUniswapV3SwapCallback {
       )
     );
     /* --- */
-
     secondsAgo = _secondsAgo;
     twapDelta = _twapDelta;
 
@@ -179,7 +172,12 @@ abstract contract JBSablier is ERC165, ERC1271, IUniswapV3SwapCallback {
     proxyTarget = _proxyTarget;
 
     controller = _controller;
+    /* --- */
   }
+
+  //*********************************************************************//
+  // ----------------------------- ERC165 ------------------------------ //
+  //*********************************************************************//
 
   /// @notice Indicates if this contract adheres to the specified interface.
   /// @dev See {IERC165-supportsInterface}.
@@ -192,37 +190,9 @@ abstract contract JBSablier is ERC165, ERC1271, IUniswapV3SwapCallback {
       _interfaceId == type(IJBSplitAllocator).interfaceId || super.supportsInterface(_interfaceId);
   }
 
-  /**
-   * @notice The Uniswap V3 pool callback (where token transfer should happens)
-   *
-   * @dev  Slippage controle is achieved here
-   */
-  function uniswapV3SwapCallback(
-    int256 amount0Delta,
-    int256 amount1Delta,
-    bytes calldata data
-  ) external override {
-    // Check if this is really a callback
-    if (msg.sender != address(POOL)) revert JBSablier_Unauthorized();
-
-    // Unpack the data
-    uint256 _minimumAmountReceived = abi.decode(data, (uint256));
-
-    // delta is in regard of the pool balance (positive = pool need to receive)
-    uint256 _amountToSendToPool = TARGET_TOKEN_IS_TOKEN0
-      ? uint256(amount1Delta)
-      : uint256(amount0Delta);
-    uint256 _amountReceivedForBeneficiary = TARGET_TOKEN_IS_TOKEN0
-      ? uint256(-amount0Delta)
-      : uint256(-amount1Delta);
-
-    // Revert if slippage is too high
-    if (_amountReceivedForBeneficiary < _minimumAmountReceived) revert JBSablier_MaxSlippage();
-
-    // Wrap and transfer the WETH to the pool
-    WETH.deposit{value: _amountToSendToPool}();
-    WETH.transfer(address(POOL), _amountToSendToPool);
-  }
+  //*********************************************************************//
+  // ----------------------------- Proxy ------------------------------- //
+  //*********************************************************************//
 
   /// @notice Deploys a PRB proxy and plugin that returns tokens to this address
   /// @dev See https://docs.sablier.com/contracts/v2/guides/proxy-architecture/deploy
@@ -303,6 +273,10 @@ abstract contract JBSablier is ERC165, ERC1271, IUniswapV3SwapCallback {
     return streams;
   }
 
+  //*********************************************************************//
+  // ----------------------- Uniswap Functions ------------------------- //
+  //*********************************************************************//
+
   /// @notice Issues distinct permits for deploying batches of streams via PRBProxy/Permit2
   /// @dev See https://docs.sablier.com/contracts/v2/guides/proxy-architecture/overview
   /// @param _token Our token as an IERC20
@@ -335,10 +309,6 @@ abstract contract JBSablier is ERC165, ERC1271, IUniswapV3SwapCallback {
 
     return permit2Params;
   }
-
-  //*********************************************************************//
-  // ---------------------- internal functions ------------------------- //
-  //*********************************************************************//
 
   /**
    * @notice  Get a quote based on twap over a secondsAgo period, taking into account a twapDelta max deviation
@@ -408,4 +378,37 @@ abstract contract JBSablier is ERC165, ERC1271, IUniswapV3SwapCallback {
       return _amountReceived;
     }
   }
+
+  /**
+   * @notice The Uniswap V3 pool callback (where token transfer should happens)
+   *
+   * @dev  Slippage controle is achieved here
+   */
+  function uniswapV3SwapCallback(
+    int256 amount0Delta,
+    int256 amount1Delta,
+    bytes calldata data
+  ) external override {
+    // Check if this is really a callback
+    if (msg.sender != address(POOL)) revert JBSablier_Unauthorized();
+
+    // Unpack the data
+    uint256 _minimumAmountReceived = abi.decode(data, (uint256));
+
+    // delta is in regard of the pool balance (positive = pool need to receive)
+    uint256 _amountToSendToPool = TARGET_TOKEN_IS_TOKEN0
+      ? uint256(amount1Delta)
+      : uint256(amount0Delta);
+    uint256 _amountReceivedForBeneficiary = TARGET_TOKEN_IS_TOKEN0
+      ? uint256(-amount0Delta)
+      : uint256(-amount1Delta);
+
+    // Revert if slippage is too high
+    if (_amountReceivedForBeneficiary < _minimumAmountReceived) revert JBSablier_MaxSlippage();
+
+    // Wrap and transfer the WETH to the pool
+    WETH.deposit{value: _amountToSendToPool}();
+    WETH.transfer(address(POOL), _amountToSendToPool);
+  }
+  
 }
