@@ -1,0 +1,6 @@
+SipsTest:testDeployProxyAndPI() (gas: 515510)
+SipsTest:testFail_DoubleDeploy() (gas: 540565)
+SipsTest:testFail_allocateExternal() (gas: 22418)
+SipsTest:testPayout() (gas: 525472)
+SipsTest:testPayoutStreamFlow() (gas: 2031411)
+SipsTest:testPoolValidity() (gas: 6685)
