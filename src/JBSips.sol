@@ -2,6 +2,12 @@
 pragma solidity ^0.8.20;
 
 import {JBSablier} from "../src/abstract/JBSablier.sol";
+import {IJBSips} from "../src/interfaces/IJBSips.sol";
+import {AddStreamsData, DeployedStreams} from "./structs/Streams.sol";
+
+import {JBSplitAllocationData} from "@jbx-protocol/juice-contracts-v3/contracts/structs/JBSplitAllocationData.sol";
+import {JBOperatable} from "@jbx-protocol/juice-contracts-v3/contracts/abstract/JBOperatable.sol";
+import {JBOperations} from "@jbx-protocol/juice-contracts-v3/contracts/libraries/JBOperations.sol";
 
 import {IJBDirectory} from "@jbx-protocol/juice-contracts-v3/contracts/interfaces/IJBDirectory.sol";
 import {IJBController3_1} from "@jbx-protocol/juice-contracts-v3/contracts/interfaces/IJBController3_1.sol";
@@ -11,31 +17,19 @@ import {IJBDirectory} from "@jbx-protocol/juice-contracts-v3/contracts/interface
 import {IJBOperatorStore} from "@jbx-protocol/juice-contracts-v3/contracts/interfaces/IJBOperatorStore.sol";
 import {JBFundingCycle} from "@jbx-protocol/juice-contracts-v3/contracts/structs/JBFundingCycle.sol";
 
-import {IERC1271} from "@openzeppelin/contracts/interfaces/IERC1271.sol";
-
-import {JBSplitAllocationData} from "@jbx-protocol/juice-contracts-v3/contracts/structs/JBSplitAllocationData.sol";
-import {JBOperatable} from "@jbx-protocol/juice-contracts-v3/contracts/abstract/JBOperatable.sol";
-import {JBOperations} from "@jbx-protocol/juice-contracts-v3/contracts/libraries/JBOperations.sol";
-
 import {ISablierV2ProxyTarget} from "@sablier/v2-periphery/src/interfaces/ISablierV2ProxyTarget.sol";
 import {ISablierV2ProxyPlugin} from "@sablier/v2-periphery/src/interfaces/ISablierV2ProxyPlugin.sol";
 import {ISablierV2LockupDynamic} from "lib/v2-periphery/lib/v2-core/src/interfaces/ISablierV2LockupDynamic.sol";
 import {ISablierV2LockupLinear} from "lib/v2-periphery/lib/v2-core/src/interfaces/ISablierV2LockupLinear.sol";
-
 import {IPRBProxy, IPRBProxyRegistry} from "@sablier/v2-periphery/src/types/Proxy.sol";
-
 import {IAllowanceTransfer, Permit2Params} from "@sablier/v2-periphery/src/types/Permit2.sol";
 
 import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import {IUniswapV3SwapCallback} from "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
-
 import {OracleLibrary} from "@uniswap/v3-periphery/contracts/libraries/OracleLibrary.sol";
-import {IERC20} from "lib/v2-periphery/lib/v2-core/src/types/Tokens.sol";
-
 import {IWETH9} from "./interfaces/external/IWETH9.sol";
-
-import {AddStreamsData, DeployedStreams} from "./structs/Streams.sol";
+import {IERC20} from "lib/v2-periphery/lib/v2-core/src/types/Tokens.sol";
 
 /**
  * @custom:benediction DEVS BENEDICAT ET PROTEGAT CONTRACTVS MEAM
@@ -46,7 +40,9 @@ import {AddStreamsData, DeployedStreams} from "./structs/Streams.sol";
  *
  * @notice Split Allocator Treasury Extension acting as a Sablier v2 Stream Manager, Deployer, and hub for users to
  *         interact with Sablier v2 streams of which they are the beneficiary.
- * @dev -- notes n stuff --
+ *
+ * @dev   This derived contract handles most stream management, stream accounting (by funding cycle), and admin duties.
+ *        JBSablier holds all logic and state variables for deploying Sablier v2 streams.
  */
 contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator, IUniswapV3SwapCallback {
     //*********************************************************************//
@@ -60,17 +56,31 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator, IUniswapV3SwapCal
     // -----------------------------  events ----------------------------- //
     //*********************************************************************//
 
+
+    //*********************************************************************//
+    // --------------------- private constant properties ----------------- //
+    //*********************************************************************//
+
+     /**
+     * @notice The unit of the max slippage (expressed in 1/10000th)
+     */
+    uint256 constant SLIPPAGE_DENOMINATOR = 10000;
+
     /**
      * @notice Address project token < address terminal token ?
      */
     bool immutable TARGET_TOKEN_IS_TOKEN0;
 
+    /**
+     * @notice The project token address
+     *
+     * @dev In this context, this is the token to be streamed
+     */
     address immutable TARGET_TOKEN;
 
-    /**
-     * @notice The unit of the max slippage (expressed in 1/10000th)
-     */
-    uint256 constant SLIPPAGE_DENOMINATOR = 10000;
+    //*********************************************************************//
+    // --------------------- public constant properties ------------------ //
+    //*********************************************************************//
 
     /**
      * @notice The uniswap pool corresponding to the project token-other token market
@@ -92,16 +102,25 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator, IUniswapV3SwapCal
     // --------------------- public stored properties -------------------- //
     //*********************************************************************//
 
+    /**
+     * @notice Future streams data sorted by juicebox projects funding cycle number
+     */
     mapping(uint256 cycleNumber => AddStreamsData) public streamsToDeploy;
+
+    /**
+     * @notice Deployed streams data sorted by juicebox projects funding cycle number
+     */
     mapping(uint256 cycleNumber => DeployedStreams) public streamsByCycle;
+
     uint256 public lastCycleNumber;
 
-    // the timeframe to use for the pool twap (from secondAgo to now)
+    /// @notice the timeframe to use for the pool twap (from secondAgo to now)
     uint32 public secondsAgo;
 
-    // the twap max deviation acepted (in 10_000th)
+    /// @notice the twap max deviation acepted (in 10_000th)
     uint256 public twapDelta;
 
+    /// @notice bool: are streams optimistically deployed upon receiving an ETH payout from JB?
     bool public streamOnPayout;
 
     //*********************************************************************//
@@ -156,21 +175,9 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator, IUniswapV3SwapCal
         twapDelta = _twapDelta;
     }
 
-    function setCurrentCycleStreams(AddStreamsData calldata _streams) 
-        external
-        requirePermission(
-            controller.projects().ownerOf(projectId),
-            projectId,
-            JBOperations.SET_SPLITS
-        ) {
-             // Track funding cycles in state var for accounting purposes
-            (JBFundingCycle memory _cycle, ) = controller.currentFundingCycleOf(
-                projectId
-            );
-            uint256 cycleNumber = _cycle.number;
-
-            streamsToDeploy[cycleNumber] = _streams;
-        }
+    //*********************************************************************//
+    // ---------------------- external functions ------------------------- //
+    //*********************************************************************//
 
     /// @notice Called by a project's payout (JBTerminal) or reserved token distribution split (JBController)
     /// @dev See https://docs.juicebox.money/dev/learn/glossary/split-allocator/
@@ -205,7 +212,7 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator, IUniswapV3SwapCal
 
             AddStreamsData memory _streamsTo = streamsToDeploy[lastCycleNumber];
 
-            DeployedStreams memory streams = super.deployStreams(_streamsTo);
+            DeployedStreams memory streams = super._deployStreams(_streamsTo);
 
             streamsByCycle[lastCycleNumber] = streams;
         }
@@ -214,7 +221,7 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator, IUniswapV3SwapCal
     /**
      * @notice The Uniswap V3 pool callback (where token transfer should happens)
      *
-     * @dev    Slippage controle is achieved here
+     * @dev  Slippage controle is achieved here
      */
     function uniswapV3SwapCallback(int256 amount0Delta, int256 amount1Delta, bytes calldata data) external override {
         // Check if this is really a callback
@@ -236,18 +243,26 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator, IUniswapV3SwapCal
         WETH.transfer(address(POOL), _amountToSendToPool);
     }
 
-    /* function deploy()
+    /// @notice Sets any number of streams to be deployed upon a projects funding cycle payout
+    /// @dev See https://docs.sablier.com/concepts/protocol/stream-types
+    /// @param _streams {AddStreamsData} Struct that includes cycle #, token & total, stream configs
+    function setCurrentCycleStreams(AddStreamsData calldata _streams) 
         external
         requirePermission(
             controller.projects().ownerOf(projectId),
             projectId,
             JBOperations.SET_SPLITS
-        )
-        returns (IPRBProxy proxy)
-    {
-        return super.deployProxyAndInstallPlugin();
-    }
- */
+        ) {
+             // Track funding cycles in state var for accounting purposes
+            (JBFundingCycle memory _cycle, ) = controller.currentFundingCycleOf(
+                projectId
+            );
+            uint256 cycleNumber = _cycle.number;
+
+            streamsToDeploy[cycleNumber] = _streams;
+        }
+
+
     //*********************************************************************//
     // ---------------------- internal functions ------------------------- //
     //*********************************************************************//
@@ -313,7 +328,5 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator, IUniswapV3SwapCal
         }
     }
 
-
-    // Function to receive Ether. msg.data must be empty
     receive() external payable {}
 }

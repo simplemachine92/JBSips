@@ -192,6 +192,8 @@ contract SipsTest is TestBaseWorkflowV3 {
         vm.prank(address(123));
         IPRBProxy _proxy = _sips.deployProxyAndInstallPlugin();
 
+        emit log_address(address(_sips.proxy()));
+
         // Declare the first stream in the batch
         Batch.CreateWithDurations memory stream0;
         stream0.sender = address(_proxy); // The sender will be able to cancel the stream

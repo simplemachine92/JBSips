@@ -29,7 +29,7 @@ import {IAllowanceTransfer, Permit2Params} from "@sablier/v2-periphery/src/types
 import {AddStreamsData, DeployedStreams} from "../structs/Streams.sol";
 
 abstract contract JBSablier is ERC165, ERC1271 {
-        //*********************************************************************//
+    //*********************************************************************//
     // --------------------------- custom errors ------------------------- //
     //*********************************************************************//
 
@@ -43,16 +43,34 @@ abstract contract JBSablier is ERC165, ERC1271 {
     IJBDirectory public directory;
     IJBController3_1 public controller;
 
-    IPRBProxy internal proxy;
+    /**
+     * @dev Proxy used for batch deploys. see https://docs.sablier.com/contracts/v2/guides/proxy-architecture/overview
+     */
+    IPRBProxy public proxy;
+
+    /// @dev Creates linear streams. see https://docs.sablier.com/contracts/v2/reference/core/contract.SablierV2LockupLinear
     ISablierV2LockupLinear public immutable lockupLinear;
+
+    /// @dev Creates dynamic streams. see https://docs.sablier.com/contracts/v2/reference/core/contract.SablierV2LockupDynamic
     ISablierV2LockupDynamic public immutable lockupDynamic;
+
+    /// @dev Includes stateless scripts for deploying streams. 
+    /// see https://docs.sablier.com/contracts/v2/reference/periphery/interfaces/interface.ISablierV2ProxyTarget
     ISablierV2ProxyTarget public proxyTarget;
+
+    /// @dev Forwards refunded assets to the proxy owner (this contract) when a stream is cancelled.
+    /// see https://docs.sablier.com/contracts/v2/reference/periphery/interfaces/interface.ISablierV2ProxyPlugin
     ISablierV2ProxyPlugin public proxyPlugin;
 
+    /// @dev see https://github.com/PaulRBerg/prb-proxy
     IPRBProxyRegistry public constant PROXY_REGISTRY =
         IPRBProxyRegistry(0x584009E9eDe26e212182c9745F5c000191296a78);
     IAllowanceTransfer public constant PERMIT2 =
         IAllowanceTransfer(0x000000000022D473030F116dDEE9F6B43aC78BA3);
+
+    //*********************************************************************//
+    // -------------------------- constructor ---------------------------- //
+    //*********************************************************************//
 
     constructor(
         uint256 _projectId,
@@ -63,19 +81,14 @@ abstract contract JBSablier is ERC165, ERC1271 {
         ISablierV2ProxyTarget _proxyTarget,
         IJBController3_1 _controller
     ) {
+        /* --- */
         projectId = _projectId;
-
-        /// @dev Mainnet JBDirectory as of 8/9/23: 0x65572FB928b46f9aDB7cfe5A4c41226F636161ea
         directory = _directory;
 
-        /// @dev Mainnet SablierV2LockupLinear as of 8/9/23: 0xB10daee1FCF62243aE27776D7a92D39dC8740f95
         lockupLinear = _lockupLinear;
-
         lockupDynamic = _lockupDynamic;
 
-        /// @dev Proxy deployer with plugin https://docs.sablier.com/contracts/v2/guides/proxy-architecture/deploy
         proxyPlugin = _proxyPlugin;
-
         proxyTarget = _proxyTarget;
 
         controller = _controller;
@@ -95,31 +108,34 @@ abstract contract JBSablier is ERC165, ERC1271 {
 
     /// @notice Deploys a PRB proxy and plugin that returns tokens to this address
     /// @dev See https://docs.sablier.com/contracts/v2/guides/proxy-architecture/deploy
-    /// @return proxy {IPRBProxy} proxy address
-    function deployProxyAndInstallPlugin() external returns (IPRBProxy proxy) {
+    /// @return _proxy {IPRBProxy} proxy address
+    function deployProxyAndInstallPlugin() public returns (IPRBProxy) {
         // Get the proxy for this contract
-        proxy = PROXY_REGISTRY.getProxy({user: address(this)});
-        if (address(proxy) == address(0)) {
+        IPRBProxy _proxy = PROXY_REGISTRY.getProxy({user: address(this)});
+        if (address(_proxy) == address(0)) {
             // If a proxy doesn't exist, deploy one and install the plugin
-            proxy = PROXY_REGISTRY.deployAndInstallPlugin({
+            _proxy = PROXY_REGISTRY.deployAndInstallPlugin({
                 plugin: proxyPlugin
             });
         } else {
             // If the proxy exists, then just install the plugin.
             PROXY_REGISTRY.installPlugin({plugin: proxyPlugin});
         }
+        proxy = _proxy;
+        return _proxy;
     }
 
-    /// @notice Deploys streams for each *stream type* defined by user
+    /// @notice Deploys streams for each stream type defined by user
     /// @dev See https://docs.sablier.com/contracts/v2/guides/proxy-architecture/batch-stream
+    /// @param _data see {AddStreamsData} from "../structs/Streams.sol";
     /// @return streams {DeployedStreams} a struct that carries the cycleNumber, and streamIds deployed via Sablier v2
-    function deployStreams(
+    function _deployStreams(
         AddStreamsData memory _data
-    ) internal returns (DeployedStreams memory streams){
+    ) internal returns (DeployedStreams memory){
         if (IERC20(_data.token).balanceOf(address(this)) < _data.total ) revert JBSablier_InsufficientBalance();
 
-        // Get the proxy for this contract
-        IPRBProxy proxy = PROXY_REGISTRY.getProxy({user: address(this)});
+        // Check if PRBProxy has been setup
+        if (address(proxy) == address(0)) deployProxyAndInstallPlugin();
 
         // Approve tokens for transfer
         _data.token.approve({ spender: address(PERMIT2), amount: type(uint160).max });
@@ -131,7 +147,7 @@ abstract contract JBSablier is ERC165, ERC1271 {
         if (_data.linWithDur.length > 0) {
 
             bytes memory data =
-                abi.encodeCall(proxyTarget.batchCreateWithDurations, (lockupLinear, _data.token, _data.linWithDur, issueNewPermit(_data.token, proxy)));
+                abi.encodeCall(proxyTarget.batchCreateWithDurations, (lockupLinear, _data.token, _data.linWithDur, _issueNewPermit(_data.token, proxy)));
 
             // Create a batch of Lockup Linear streams via the proxy and Sablier's proxy target
             bytes memory response = proxy.execute(address(proxyTarget), data);
@@ -141,7 +157,7 @@ abstract contract JBSablier is ERC165, ERC1271 {
         if (_data.linWithRange.length > 0) {
 
             bytes memory data =
-                abi.encodeCall(proxyTarget.batchCreateWithRange, (lockupLinear, _data.token, _data.linWithRange, issueNewPermit(_data.token, proxy)));
+                abi.encodeCall(proxyTarget.batchCreateWithRange, (lockupLinear, _data.token, _data.linWithRange, _issueNewPermit(_data.token, proxy)));
 
             bytes memory response = proxy.execute(address(proxyTarget), data);
             streams.linearRangeStreams = abi.decode(response, (uint256[]));
@@ -150,7 +166,7 @@ abstract contract JBSablier is ERC165, ERC1271 {
         if (_data.dynWithDelta.length > 0) {
 
             bytes memory data =
-                abi.encodeCall(proxyTarget.batchCreateWithDeltas, (lockupDynamic, _data.token, _data.dynWithDelta, issueNewPermit(_data.token, proxy)));
+                abi.encodeCall(proxyTarget.batchCreateWithDeltas, (lockupDynamic, _data.token, _data.dynWithDelta, _issueNewPermit(_data.token, proxy)));
 
             bytes memory response = proxy.execute(address(proxyTarget), data);
             streams.dynDeltaStreams = abi.decode(response, (uint256[]));
@@ -159,7 +175,7 @@ abstract contract JBSablier is ERC165, ERC1271 {
         if (_data.dynWithMiles.length > 0) {
             
             bytes memory data =
-                abi.encodeCall(proxyTarget.batchCreateWithMilestones, (lockupDynamic, _data.token, _data.dynWithMiles, issueNewPermit(_data.token, proxy)));
+                abi.encodeCall(proxyTarget.batchCreateWithMilestones, (lockupDynamic, _data.token, _data.dynWithMiles, _issueNewPermit(_data.token, proxy)));
 
             bytes memory response = proxy.execute(address(proxyTarget), data);
             streams.dynMileStreams = abi.decode(response, (uint256[]));
@@ -173,11 +189,11 @@ abstract contract JBSablier is ERC165, ERC1271 {
     /// @param _token Our token as an IERC20
     /// @param _proxy Our proxy assigned to this contract
     /// @return Permit2Params The new permit params, which should include a new nonce, as this is called in succession of a proxy.execute()
-    function issueNewPermit(IERC20 _token, IPRBProxy _proxy) private view returns (Permit2Params memory) {
+    function _issueNewPermit(IERC20 _token, IPRBProxy _proxy) private view returns (Permit2Params memory) {
         // Set up Permit2. See the full documentation at https://github.com/Uniswap/permit2
         IAllowanceTransfer.PermitDetails memory permitDetails;
         permitDetails.token = address(_token);
-        permitDetails.amount = type(uint160).max; /* uint160(_data.total); */
+        permitDetails.amount = type(uint160).max;
         permitDetails.expiration = type(uint48).max; // maximum expiration possible
         (,, permitDetails.nonce) =
             PERMIT2.allowance({ user: address(this), token: address(_token), spender: address(_proxy) });
