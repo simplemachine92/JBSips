@@ -99,9 +99,7 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator {
       _twapDelta
     )
     JBOperatable(IJBOperatorStore(_operatorStore))
-  {
-    
-  }
+  {}
 
   //*********************************************************************//
   // ---------------------- external functions ------------------------- //
@@ -110,7 +108,7 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator {
   /// @notice Called by a project's payout (JBTerminal) or reserved token distribution split (JBController)
   /// @dev See https://docs.juicebox.money/dev/learn/glossary/split-allocator/
   /// @param _data See https://docs.juicebox.money/dev/api/data-structures/jbsplitallocationdata/
-  function allocate(JBSplitAllocationData calldata _data) external override payable {
+  function allocate(JBSplitAllocationData calldata _data) external payable override {
     // Ensure call is coming from Terminal or Controller
     if (
       !directory.isTerminalOf(_data.projectId, IJBPaymentTerminal(msg.sender)) &&

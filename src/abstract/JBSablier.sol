@@ -408,5 +408,4 @@ abstract contract JBSablier is ERC165, ERC1271, IUniswapV3SwapCallback {
       return _amountReceived;
     }
   }
-
 }
