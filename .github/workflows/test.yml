@@ -10,8 +10,9 @@ jobs:
   forge-test:
     runs-on: ubuntu-latest
     steps:
+      - shell: bash
         env:
-          MAINNET_RPC_URL: ${{ secrets.MAINNET_RPC_URL }}
+          SUPER_SECRET: ${{ secrets.SuperSecret }}
       - uses: actions/checkout@v2
         with:
           submodules: recursive
