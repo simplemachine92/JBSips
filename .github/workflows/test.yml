@@ -10,9 +10,6 @@ jobs:
   forge-test:
     runs-on: ubuntu-latest
     steps:
-      - shell: bash
-        env:
-          SUPER_SECRET: ${{ secrets.SuperSecret }}
       - uses: actions/checkout@v2
         with:
           submodules: recursive
@@ -52,4 +49,7 @@ jobs:
       - name: install libraries
         run: git submodule update --init
       - name: Run tests
+        - shell: bash
+        env:
+          SUPER_SECRET: ${{ secrets.SuperSecret }}
         run: forge snapshot --diff --force --optimize -vvv
