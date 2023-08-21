@@ -2,10 +2,10 @@ name: tests
 on:
   pull_request:
     branches:
-      - main
+      - jbsips
   push:
     branches:
-      - main
+      - jbsips
 jobs:
   forge-test:
     runs-on: ubuntu-latest
