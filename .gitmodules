@@ -1,15 +1,21 @@
 [submodule "lib/forge-std"]
 	path = lib/forge-std
 	url = https://github.com/foundry-rs/forge-std
+[submodule "lib/prb-proxy"]
+	path = lib/prb-proxy
+	url = https://github.com/PaulRBerg/prb-proxy
+[submodule "lib/univ3-periph"]
+	path = lib/univ3-periph
+	url = https://github.com/uniswap/v3-periphery
+[submodule "lib/univ3-core"]
+	path = lib/univ3-core
+	url = https://github.com/uniswap/v3-core
 [submodule "lib/v2-core"]
 	path = lib/v2-core
 	url = https://github.com/sablier-labs/v2-core
 [submodule "lib/v2-periphery"]
 	path = lib/v2-periphery
 	url = https://github.com/sablier-labs/v2-periphery
-[submodule "lib/prb-proxy"]
-	path = lib/prb-proxy
-	url = https://github.com/PaulRBerg/prb-proxy
 [submodule "lib/prb-math"]
 	path = lib/prb-math
 	url = https://github.com/PaulRBerg/prb-math
