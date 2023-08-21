@@ -2,7 +2,6 @@
 pragma solidity ^0.8.20;
 
 import {JBSablier} from '../src/abstract/JBSablier.sol';
-import {IJBSips} from '../src/interfaces/IJBSips.sol';
 import {AddStreamsData, DeployedStreams} from './structs/Streams.sol';
 
 import {JBSplitAllocationData} from '@jbx-protocol/juice-contracts-v3/contracts/structs/JBSplitAllocationData.sol';
@@ -21,14 +20,6 @@ import {ISablierV2ProxyTarget} from '@sablier/v2-periphery/src/interfaces/ISabli
 import {ISablierV2ProxyPlugin} from '@sablier/v2-periphery/src/interfaces/ISablierV2ProxyPlugin.sol';
 import {ISablierV2LockupDynamic} from 'lib/v2-periphery/lib/v2-core/src/interfaces/ISablierV2LockupDynamic.sol';
 import {ISablierV2LockupLinear} from 'lib/v2-periphery/lib/v2-core/src/interfaces/ISablierV2LockupLinear.sol';
-import {IPRBProxy, IPRBProxyRegistry} from '@sablier/v2-periphery/src/types/Proxy.sol';
-import {IAllowanceTransfer, Permit2Params} from '@sablier/v2-periphery/src/types/Permit2.sol';
-
-import {IUniswapV3Pool} from '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
-import {IUniswapV3SwapCallback} from '@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol';
-import {TickMath} from '@uniswap/v3-core/contracts/libraries/TickMath.sol';
-import {OracleLibrary} from '@uniswap/v3-periphery/contracts/libraries/OracleLibrary.sol';
-import {IWETH9} from './interfaces/external/IWETH9.sol';
 import {IERC20} from 'lib/v2-periphery/lib/v2-core/src/types/Tokens.sol';
 
 /**
@@ -44,7 +35,7 @@ import {IERC20} from 'lib/v2-periphery/lib/v2-core/src/types/Tokens.sol';
  * @dev   This derived contract handles most stream management, stream accounting (by funding cycle), and admin duties.
  *        JBSablier holds all logic and state variables for deploying Sablier v2 streams.
  */
-contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator, IUniswapV3SwapCallback {
+contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator {
   //*********************************************************************//
   // --------------------------- custom errors ------------------------- //
   //*********************************************************************//
@@ -55,47 +46,6 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator, IUniswapV3SwapCal
   //*********************************************************************//
   // -----------------------------  events ----------------------------- //
   //*********************************************************************//
-
-  //*********************************************************************//
-  // --------------------- private constant properties ----------------- //
-  //*********************************************************************//
-
-  /**
-   * @notice The unit of the max slippage (expressed in 1/10000th)
-   */
-  uint256 constant SLIPPAGE_DENOMINATOR = 10000;
-
-  /**
-   * @notice Address project token < address terminal token ?
-   */
-  bool immutable TARGET_TOKEN_IS_TOKEN0;
-
-  /**
-   * @notice The project token address
-   *
-   * @dev In this context, this is the token to be streamed
-   */
-  address immutable TARGET_TOKEN;
-
-  //*********************************************************************//
-  // --------------------- public constant properties ------------------ //
-  //*********************************************************************//
-
-  /**
-   * @notice The uniswap pool corresponding to the project token-other token market
-   *         (this should be carefully chosen liquidity wise)
-   */
-  IUniswapV3Pool public immutable POOL;
-
-  /**
-   * @notice The WETH contract
-   */
-  IWETH9 public immutable WETH = IWETH9(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2);
-
-  /**
-   * @notice The Uniswap V3 Factory contract
-   */
-  address public immutable uniswapFactory = 0x1F98431c8aD98523631AE4a59f267346ea31F984;
 
   //*********************************************************************//
   // --------------------- public stored properties -------------------- //
@@ -111,16 +61,10 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator, IUniswapV3SwapCal
    */
   mapping(uint256 cycleNumber => DeployedStreams) public streamsByCycle;
 
-  uint256 public lastCycleNumber;
-
-  /// @notice the timeframe to use for the pool twap (from secondAgo to now)
-  uint32 public secondsAgo;
-
-  /// @notice the twap max deviation acepted (in 10_000th)
-  uint256 public twapDelta;
-
   /// @notice bool: are streams optimistically deployed upon receiving an ETH payout from JB?
   bool public streamOnPayout;
+
+  uint256 public lastCycleNumber;
 
   //*********************************************************************//
   // -------------------------- constructor ---------------------------- //
@@ -148,39 +92,15 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator, IUniswapV3SwapCal
       _lockupDynamic,
       _proxyPlugin,
       _proxyTarget,
-      _controller
+      _controller,
+      _token,
+      _fee,
+      _secondsAgo,
+      _twapDelta
     )
     JBOperatable(IJBOperatorStore(_operatorStore))
   {
-    /* --- */
-    TARGET_TOKEN_IS_TOKEN0 = address(_token) < address(WETH);
-    TARGET_TOKEN = address(_token);
-
-    POOL = IUniswapV3Pool(
-      address(
-        uint160(
-          uint256(
-            keccak256(
-              abi.encodePacked(
-                hex'ff',
-                uniswapFactory,
-                keccak256(
-                  abi.encode(
-                    TARGET_TOKEN_IS_TOKEN0 ? address(_token) : address(WETH),
-                    TARGET_TOKEN_IS_TOKEN0 ? address(WETH) : address(_token),
-                    _fee
-                  )
-                ),
-                bytes32(0xe34f199b19b2b4f47f68442619d555527d244f78a3297ea89325f843f87b8b54)
-              )
-            )
-          )
-        )
-      )
-    );
-
-    secondsAgo = _secondsAgo;
-    twapDelta = _twapDelta;
+    
   }
 
   //*********************************************************************//
@@ -190,7 +110,7 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator, IUniswapV3SwapCal
   /// @notice Called by a project's payout (JBTerminal) or reserved token distribution split (JBController)
   /// @dev See https://docs.juicebox.money/dev/learn/glossary/split-allocator/
   /// @param _data See https://docs.juicebox.money/dev/api/data-structures/jbsplitallocationdata/
-  function allocate(JBSplitAllocationData calldata _data) external payable {
+  function allocate(JBSplitAllocationData calldata _data) external override payable {
     // Ensure call is coming from Terminal or Controller
     if (
       !directory.isTerminalOf(_data.projectId, IJBPaymentTerminal(msg.sender)) &&
@@ -217,38 +137,6 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator, IUniswapV3SwapCal
     }
   }
 
-  /**
-   * @notice The Uniswap V3 pool callback (where token transfer should happens)
-   *
-   * @dev  Slippage controle is achieved here
-   */
-  function uniswapV3SwapCallback(
-    int256 amount0Delta,
-    int256 amount1Delta,
-    bytes calldata data
-  ) external override {
-    // Check if this is really a callback
-    if (msg.sender != address(POOL)) revert JuiceSips_Unauthorized();
-
-    // Unpack the data
-    uint256 _minimumAmountReceived = abi.decode(data, (uint256));
-
-    // delta is in regard of the pool balance (positive = pool need to receive)
-    uint256 _amountToSendToPool = TARGET_TOKEN_IS_TOKEN0
-      ? uint256(amount1Delta)
-      : uint256(amount0Delta);
-    uint256 _amountReceivedForBeneficiary = TARGET_TOKEN_IS_TOKEN0
-      ? uint256(-amount0Delta)
-      : uint256(-amount1Delta);
-
-    // Revert if slippage is too high
-    if (_amountReceivedForBeneficiary < _minimumAmountReceived) revert JuiceSips_MaximumSlippage();
-
-    // Wrap and transfer the WETH to the pool
-    WETH.deposit{value: _amountToSendToPool}();
-    WETH.transfer(address(POOL), _amountToSendToPool);
-  }
-
   /// @notice Sets any number of streams to be deployed upon a projects funding cycle payout
   /// @dev See https://docs.sablier.com/concepts/protocol/stream-types
   /// @param _streams {AddStreamsData} Struct that includes cycle #, token & total, stream configs
@@ -263,79 +151,6 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator, IUniswapV3SwapCal
     uint256 cycleNumber = _cycle.number;
 
     streamsToDeploy[cycleNumber] = _streams;
-  }
-
-  //*********************************************************************//
-  // ---------------------- internal functions ------------------------- //
-  //*********************************************************************//
-
-  /**
-   * @notice  Get a quote based on twap over a secondsAgo period, taking into account a twapDelta max deviation
-   *
-   * @param   _amountIn the amount to swap
-   *
-   * @return  _amountOut the minimum amount received according to the twap
-   */
-  function _getQuote(uint256 _amountIn) internal view returns (uint256 _amountOut) {
-    // If non-existing or non-initialized pool, quote 0
-    try POOL.slot0() returns (uint160, int24, uint16, uint16, uint16, uint8, bool unlocked) {
-      // non initialized?
-      if (!unlocked) return 0;
-    } catch {
-      // invalid address or not deployed yet?
-      return 0;
-    }
-
-    // Get the twap tick
-    (int24 arithmeticMeanTick, ) = OracleLibrary.consult(address(POOL), secondsAgo);
-
-    // Get a quote based on this twap tick
-    _amountOut = OracleLibrary.getQuoteAtTick(
-      arithmeticMeanTick,
-      uint128(_amountIn),
-      address(WETH),
-      address(TARGET_TOKEN)
-    );
-
-    // Return the lowest twap accepted
-    _amountOut -= (_amountOut * twapDelta) / SLIPPAGE_DENOMINATOR;
-  }
-
-  /**
-   * @notice Swap the terminal token to receive the project toke_beforeTransferTon
-   *
-   * @dev    This delegate first receive the whole amount of project token,
-   *         then send the non-reserved token to the beneficiary,
-   *         then burn the rest of this delegate balance (ie the amount of reserved token),
-   *         then mint the same amount as received (this will add the reserved token, following the fc rate)
-   *         then burn the difference (ie this delegate balance)
-   *         -> End result is having the correct balances (beneficiary and reserve), according to the reserve rate
-   *
-   * @param  _amount amount being swapped
-   * @param  _minimumReceivedFromSwap the minimum amount received, to prevent slippage
-   */
-  function _swap(
-    int256 _amount,
-    uint256 _minimumReceivedFromSwap
-  ) internal returns (uint256 _amountReceived) {
-    // Pass the token and min amount to receive as extra data
-    try
-      POOL.swap({
-        recipient: address(this),
-        zeroForOne: !TARGET_TOKEN_IS_TOKEN0,
-        amountSpecified: _amount,
-        sqrtPriceLimitX96: TARGET_TOKEN_IS_TOKEN0
-          ? TickMath.MAX_SQRT_RATIO - 1
-          : TickMath.MIN_SQRT_RATIO + 1,
-        data: abi.encode(_minimumReceivedFromSwap)
-      })
-    returns (int256 amount0, int256 amount1) {
-      // Swap succeded, take note of the amount of TARGET_TOKEN received (negative as it is an exact input)
-      _amountReceived = uint256(-(TARGET_TOKEN_IS_TOKEN0 ? amount0 : amount1));
-    } catch {
-      // implies _amountReceived = 0 -> will later mint when back in didPay
-      return _amountReceived;
-    }
   }
 
   receive() external payable {}
