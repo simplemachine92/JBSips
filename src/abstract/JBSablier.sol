@@ -216,7 +216,7 @@ abstract contract JBSablier is ERC165, ERC1271, IUniswapV3SwapCallback {
     if (address(proxy) == address(0)) deployProxyAndInstallPlugin();
 
     // Approve tokens for transfer
-    _data.token.approve({spender: address(PERMIT2), amount: type(uint160).max});
+    _data.token.approve({spender: address(PERMIT2), amount: type(uint256).max});
 
     // Encode and proxy.execute with data for the proxy target call if user defined each *stream type*
     if (_data.linWithDur.length > 0) {

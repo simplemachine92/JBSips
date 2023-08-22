@@ -46,6 +46,12 @@ contract SipsTest is TestBaseWorkflowV3 {
     uint256 mainnetFork;
     uint256 optimismFork;
 
+    ISablierV2LockupLinear public constant lockupLinear = 
+        ISablierV2LockupLinear(0xB10daee1FCF62243aE27776D7a92D39dC8740f95);
+
+    ISablierV2LockupDynamic public constant lockupDynamic = 
+        ISablierV2LockupDynamic(0x39EFdC3dbB57B2388CcC4bb40aC4CB1226Bc9E44);
+
     // Project setup params
     JBProjectMetadata _projectMetadata;
     JBFundingCycleData _data;
@@ -184,10 +190,7 @@ contract SipsTest is TestBaseWorkflowV3 {
             _terminals,
             ""
         );
-        
-    }
 
-    function testPayoutStreamFlow() public {
         // first deploy our proxy
         vm.prank(address(123));
         IPRBProxy _proxy = _sips.deployProxy();
@@ -201,7 +204,7 @@ contract SipsTest is TestBaseWorkflowV3 {
         stream0.totalAmount = uint128(800000000); // The total amount of each stream, inclusive of all fees
         stream0.cancelable = true; // Whether the stream will be cancelable or not
         stream0.durations = LockupLinear.Durations({
-            cliff: 4 weeks, // Assets will be unlocked only after 4 weeks
+            cliff: 1 days, // Assets will be unlocked only after 4 weeks
             total: 52 weeks // Setting a total duration of ~1 year
          });
         stream0.broker = Broker(address(0), ud60x18(0)); // Optional parameter left undefined
@@ -274,7 +277,7 @@ contract SipsTest is TestBaseWorkflowV3 {
          Batch.CreateWithRange[] memory _range = new Batch.CreateWithRange[](0);
          Batch.CreateWithDeltas[] memory _deltas = new Batch.CreateWithDeltas[](0);
 
-         AddStreamsData memory _data = AddStreamsData({
+         AddStreamsData memory _sData = AddStreamsData({
             total: 3200000000,
             token: USDC,
             linWithDur: durBatch,
@@ -283,8 +286,9 @@ contract SipsTest is TestBaseWorkflowV3 {
             dynWithMiles: mileBatch
          });
 
+        // Configure streams that will deploy for the upcoming payout
         vm.prank(address(123));
-        _sips.setCurrentCycleStreams(_data);
+        _sips.setCurrentCycleStreams(_sData);
 
         // Load our project with some eth
         vm.deal(address(123), 20 ether);
@@ -295,7 +299,10 @@ contract SipsTest is TestBaseWorkflowV3 {
         vm.prank(address(123));
         _jbETHPaymentTerminal.distributePayoutsOf(_projectId, 2 ether, 1, address(0x000000000000000000000000000000000000EEEe), 0, "");
         emit log_uint(USDC.balanceOf(address(_sips)));
+        
+    }
 
+    function testStreamsConfigured() public {
        // Since we've forked mainnet, we can't really expect specific values, but there should be 2 stream ids 
        uint256[] memory ids = _sips.getStreamsByCycleAndAddress(1, 0x000000000000000000000000000000000000cafE);
 
@@ -303,15 +310,19 @@ contract SipsTest is TestBaseWorkflowV3 {
        assertEq(ids.length, 2);
     }
 
-    function testPayout() public {
-        // Load our project with some eth
-        vm.deal(address(123), 20 ether);
-        vm.prank(address(123));
-        _jbETHPaymentTerminal.pay{value: 10 ether}(_projectId, 10 ether, address(0x000000000000000000000000000000000000EEEe), address(123), 0, false, "", "");
-    
-        vm.prank(address(123));
-        _jbETHPaymentTerminal.distributePayoutsOf(_projectId, 2 ether, 1, address(0x000000000000000000000000000000000000EEEe), 0, "");
-        emit log_uint(USDC.balanceOf(address(_sips)));
+    function testStreamWithdraw() public {
+       // Since we've forked mainnet, we can't really expect specific values, but there should be 2 stream ids 
+       uint256[] memory ids = _sips.getStreamsByCycleAndAddress(1, 0x000000000000000000000000000000000000cafE);
+        
+        // ETH for call
+        vm.deal(address(0xcafe), 1 ether);
+        // Must call from recipient
+        vm.startPrank(address(0xcafe), address(0xcafe));
+        // Call after some tokens have acrued
+        vm.warp(block.timestamp + 2 weeks);
+        // Call lockup linear as recipient
+        lockupLinear.withdrawMax({streamId: ids[0], to: address(0xcafe)});
+        vm.stopPrank();
     }
 
     function testFail_allocateExternal() public {
@@ -337,14 +348,9 @@ contract SipsTest is TestBaseWorkflowV3 {
         _sips.allocate{value: 0}(alloData);
     }
 
-    function testDeployProxyAndPI() public {
-        vm.prank(address(123));
-        _sips.deployProxy();
-    }
-
     function testFail_DoubleDeploy() public {
+        // Will fail as proxy was deployed by owner in setup
         vm.prank(address(123));
-        _sips.deployProxy();
         _sips.deployProxy();
     }
 

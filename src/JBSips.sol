@@ -154,7 +154,13 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator {
     returns (IPRBProxy)
   {
     IPRBProxy proxy = super.deployProxyAndInstallPlugin();
+    return proxy;
   }
+
+  //*********************************************************************//
+  // ----------------------- admin functions --------------------------- //
+  //*********************************************************************//
+
 
   receive() external payable {}
 }
