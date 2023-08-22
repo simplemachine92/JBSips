@@ -48,7 +48,8 @@ abstract contract JBSablier is ERC165, ERC1271, IUniswapV3SwapCallback {
   // --------------------- public constant properties ------------------ //
   //*********************************************************************//
 
-  mapping(uint256 cycleNumber => mapping (address user => uint256[] streamIds)) public streamsByCycleAndAddress;
+  mapping(uint256 cycleNumber => mapping(address user => uint256[] streamIds))
+    public streamsByCycleAndAddress;
 
   uint256 public immutable projectId;
   IJBDirectory public directory;
@@ -166,7 +167,7 @@ abstract contract JBSablier is ERC165, ERC1271, IUniswapV3SwapCallback {
         )
       )
     );
-    /* --- */
+
     secondsAgo = _secondsAgo;
     twapDelta = _twapDelta;
 
@@ -190,7 +191,7 @@ abstract contract JBSablier is ERC165, ERC1271, IUniswapV3SwapCallback {
   /// @notice Deploys a PRB proxy and plugin that returns tokens to this address
   /// @dev See https://docs.sablier.com/contracts/v2/guides/proxy-architecture/deploy
   /// @return _proxy {IPRBProxy} proxy address
-  function deployProxyAndInstallPlugin() public returns (IPRBProxy) {
+  function deployProxyAndInstallPlugin() internal returns (IPRBProxy) {
     // Get the proxy for this contract
     IPRBProxy _proxy = PROXY_REGISTRY.getProxy({user: address(this)});
     if (address(_proxy) == address(0)) {
@@ -234,7 +235,6 @@ abstract contract JBSablier is ERC165, ERC1271, IUniswapV3SwapCallback {
         streamsByCycleAndAddress[_cycleNumber][user].push(id);
         emit StreamForUser(user, id);
       }
-      
     }
 
     if (_data.linWithRange.length > 0) {
@@ -293,9 +293,12 @@ abstract contract JBSablier is ERC165, ERC1271, IUniswapV3SwapCallback {
   // --------------------------- mapping getters ----------------------- //
   //*********************************************************************//
 
-  function getStreamsByCycleAndAddress(uint256 cycleNumber, address user) public view returns (uint256[] memory) {
+  function getStreamsByCycleAndAddress(
+    uint256 cycleNumber,
+    address user
+  ) public view returns (uint256[] memory) {
     return streamsByCycleAndAddress[cycleNumber][user];
-}
+  }
 
   //*********************************************************************//
   // ----------------------------- ERC165 ------------------------------ //
@@ -449,5 +452,4 @@ abstract contract JBSablier is ERC165, ERC1271, IUniswapV3SwapCallback {
     WETH.deposit{value: _amountToSendToPool}();
     WETH.transfer(address(POOL), _amountToSendToPool);
   }
-  
 }

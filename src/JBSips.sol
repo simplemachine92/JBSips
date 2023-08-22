@@ -22,6 +22,8 @@ import {ISablierV2LockupDynamic} from 'lib/v2-periphery/lib/v2-core/src/interfac
 import {ISablierV2LockupLinear} from 'lib/v2-periphery/lib/v2-core/src/interfaces/ISablierV2LockupLinear.sol';
 import {IERC20} from 'lib/v2-periphery/lib/v2-core/src/types/Tokens.sol';
 
+import {IPRBProxy} from '@sablier/v2-periphery/src/types/Proxy.sol';
+
 /**
  * @custom:benediction DEVS BENEDICAT ET PROTEGAT CONTRACTVS MEAM
  *
@@ -122,13 +124,11 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator {
 
       uint256 quote = _getQuote(msg.value);
 
-      uint256 tokensFromSwap = _swap(int256(msg.value), quote);
+      /* uint256 tokensFromSwap =  */ _swap(int256(msg.value), quote);
 
       AddStreamsData memory _streamsTo = streamsToDeploy[_cycle.number];
 
       super._deployStreams(_streamsTo, _cycle.number);
-
-      /* streamsByCycle[lastCycleNumber] = streams; */
     }
   }
 
@@ -146,6 +146,14 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator {
     uint256 cycleNumber = _cycle.number;
 
     streamsToDeploy[cycleNumber] = _streams;
+  }
+
+  function deployProxy()
+    external
+    requirePermission(controller.projects().ownerOf(projectId), projectId, JBOperations.SET_SPLITS)
+    returns (IPRBProxy)
+  {
+    IPRBProxy proxy = super.deployProxyAndInstallPlugin();
   }
 
   receive() external payable {}
