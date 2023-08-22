@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 
 import "@jbx-protocol/juice-contracts-v3/contracts/JBController3_1.sol";
 import "@jbx-protocol/juice-contracts-v3/contracts/JBDirectory.sol";
-import "@jbx-protocol/juice-contracts-v3/contracts/JBETHPaymentTerminal3_1_1.sol";
+import "@jbx-protocol/juice-contracts-v3/contracts/JBETHPaymentTerminal3_1_2.sol";
 import "@jbx-protocol/juice-contracts-v3/contracts/JBFundAccessConstraintsStore.sol";
 import "@jbx-protocol/juice-contracts-v3/contracts/JBSingleTokenPaymentTerminalStore3_1_1.sol";
 import "@jbx-protocol/juice-contracts-v3/contracts/JBFundingCycleStore.sol";
@@ -58,7 +58,7 @@ contract TestBaseWorkflowV3 is Test {
     JBSplitsStore internal _jbSplitsStore;
     JBController3_1 internal _jbController;
     JBSingleTokenPaymentTerminalStore3_1_1 internal _jbPaymentTerminalStore;
-    JBETHPaymentTerminal3_1_1 internal _jbETHPaymentTerminal;
+    JBETHPaymentTerminal3_1_2 internal _jbETHPaymentTerminal;
     AccessJBLib internal _accessJBLib;
 
     //*********************************************************************//
@@ -138,8 +138,8 @@ contract TestBaseWorkflowV3 is Test {
         // AccessJBLib
         _accessJBLib = new AccessJBLib();
 
-        // JBETHPaymentTerminal3_1_1
-        _jbETHPaymentTerminal = new JBETHPaymentTerminal3_1_1(
+        // JBETHPaymentTerminal3_1_2
+        _jbETHPaymentTerminal = new JBETHPaymentTerminal3_1_2(
             _accessJBLib.ETH(),
             _jbOperatorStore,
             _jbProjects,
@@ -149,7 +149,7 @@ contract TestBaseWorkflowV3 is Test {
             address(_jbPaymentTerminalStore),
             _multisig
         );
-        vm.label(address(_jbETHPaymentTerminal), "JBETHPaymentTerminal3_1_1");
+        vm.label(address(_jbETHPaymentTerminal), "JBETHPaymentTerminal3_1_2");
     }
 
     //https://ethereum.stackexchange.com/questions/24248/how-to-calculate-an-ethereum-contracts-address-during-its-creation-using-the-so

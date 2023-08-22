@@ -9,7 +9,7 @@
     "pretty": "prettier --write \"./src/**/*.{js,jsx,json,sol}\""
   },
   "dependencies": {
-    "@jbx-protocol/juice-contracts-v3": "^4.0.2",
+    "@jbx-protocol/juice-contracts-v3": "^5.0.0",
     "@jbx-protocol/juice-delegates-registry": "^1.0.3"
   }
 }
