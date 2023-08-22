@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {JBSablier} from '../src/abstract/JBSablier.sol';
-import {AddStreamsData, DeployedStreams} from './structs/Streams.sol';
+import {AddStreamsData} from './structs/Streams.sol';
 
 import {JBSplitAllocationData} from '@jbx-protocol/juice-contracts-v3/contracts/structs/JBSplitAllocationData.sol';
 import {JBOperatable} from '@jbx-protocol/juice-contracts-v3/contracts/abstract/JBOperatable.sol';
@@ -21,6 +21,8 @@ import {ISablierV2ProxyPlugin} from '@sablier/v2-periphery/src/interfaces/ISabli
 import {ISablierV2LockupDynamic} from 'lib/v2-periphery/lib/v2-core/src/interfaces/ISablierV2LockupDynamic.sol';
 import {ISablierV2LockupLinear} from 'lib/v2-periphery/lib/v2-core/src/interfaces/ISablierV2LockupLinear.sol';
 import {IERC20} from 'lib/v2-periphery/lib/v2-core/src/types/Tokens.sol';
+
+import {IPRBProxy} from '@sablier/v2-periphery/src/types/Proxy.sol';
 
 /**
  * @custom:benediction DEVS BENEDICAT ET PROTEGAT CONTRACTVS MEAM
@@ -55,11 +57,6 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator {
    * @notice Future streams data sorted by juicebox projects funding cycle number
    */
   mapping(uint256 cycleNumber => AddStreamsData) public streamsToDeploy;
-
-  /**
-   * @notice Deployed streams data sorted by juicebox projects funding cycle number
-   */
-  mapping(uint256 cycleNumber => DeployedStreams) public streamsByCycle;
 
   /// @notice bool: are streams optimistically deployed upon receiving an ETH payout from JB?
   bool public streamOnPayout;
@@ -124,17 +121,14 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator {
     if (directory.isTerminalOf(_data.projectId, IJBPaymentTerminal(msg.sender))) {
       // Track funding cycles in state var for accounting purposes
       (JBFundingCycle memory _cycle, ) = controller.currentFundingCycleOf(projectId);
-      lastCycleNumber = _cycle.number;
 
       uint256 quote = _getQuote(msg.value);
 
-      uint256 tokensFromSwap = _swap(int256(msg.value), quote);
+      /* uint256 tokensFromSwap =  */ _swap(int256(msg.value), quote);
 
-      AddStreamsData memory _streamsTo = streamsToDeploy[lastCycleNumber];
+      AddStreamsData memory _streamsTo = streamsToDeploy[_cycle.number];
 
-      DeployedStreams memory streams = super._deployStreams(_streamsTo);
-
-      streamsByCycle[lastCycleNumber] = streams;
+      super._deployStreams(_streamsTo, _cycle.number);
     }
   }
 
@@ -153,6 +147,20 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator {
 
     streamsToDeploy[cycleNumber] = _streams;
   }
+
+  function deployProxy()
+    external
+    requirePermission(controller.projects().ownerOf(projectId), projectId, JBOperations.SET_SPLITS)
+    returns (IPRBProxy)
+  {
+    IPRBProxy proxy = super.deployProxyAndInstallPlugin();
+    return proxy;
+  }
+
+  //*********************************************************************//
+  // ----------------------- admin functions --------------------------- //
+  //*********************************************************************//
+
 
   receive() external payable {}
 }

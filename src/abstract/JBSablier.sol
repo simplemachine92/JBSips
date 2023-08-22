@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {ERC1271} from './ERC1271.sol';
-import {AddStreamsData, DeployedStreams} from '../structs/Streams.sol';
+import {AddStreamsData} from '../structs/Streams.sol';
 
 import {IJBSplitAllocator} from '@jbx-protocol/juice-contracts-v3/contracts/interfaces/IJBSplitAllocator.sol';
 import {IJBPaymentTerminal} from '@jbx-protocol/juice-contracts-v3/contracts/interfaces/IJBPaymentTerminal.sol';
@@ -39,8 +39,17 @@ abstract contract JBSablier is ERC165, ERC1271, IUniswapV3SwapCallback {
   error JBSablier_InsufficientBalance();
 
   //*********************************************************************//
+  // -----------------------------  events ----------------------------- //
+  //*********************************************************************//
+
+  event StreamForUser(address user, uint256 streamId);
+
+  //*********************************************************************//
   // --------------------- public constant properties ------------------ //
   //*********************************************************************//
+
+  mapping(uint256 cycleNumber => mapping(address user => uint256[] streamIds))
+    public streamsByCycleAndAddress;
 
   uint256 public immutable projectId;
   IJBDirectory public directory;
@@ -96,14 +105,14 @@ abstract contract JBSablier is ERC165, ERC1271, IUniswapV3SwapCallback {
   /**
    * @notice Address project token < address terminal token ?
    */
-  bool immutable TARGET_TOKEN_IS_TOKEN0;
+  bool public immutable TARGET_TOKEN_IS_TOKEN0;
 
   /**
    * @notice The project token address
    *
    * @dev In this context, this is the token to be streamed
    */
-  address immutable TARGET_TOKEN;
+  address public immutable TARGET_TOKEN;
 
   //*********************************************************************//
   // --------------------- private constant properties ----------------- //
@@ -112,7 +121,7 @@ abstract contract JBSablier is ERC165, ERC1271, IUniswapV3SwapCallback {
   /**
    * @notice The unit of the max slippage (expressed in 1/10000th)
    */
-  uint256 constant SLIPPAGE_DENOMINATOR = 10000;
+  uint256 private constant SLIPPAGE_DENOMINATOR = 10000;
 
   //*********************************************************************//
   // -------------------------- constructor ---------------------------- //
@@ -158,7 +167,7 @@ abstract contract JBSablier is ERC165, ERC1271, IUniswapV3SwapCallback {
         )
       )
     );
-    /* --- */
+
     secondsAgo = _secondsAgo;
     twapDelta = _twapDelta;
 
@@ -173,6 +182,122 @@ abstract contract JBSablier is ERC165, ERC1271, IUniswapV3SwapCallback {
 
     controller = _controller;
     /* --- */
+  }
+
+  //*********************************************************************//
+  // ----------------------------- Proxy ------------------------------- //
+  //*********************************************************************//
+
+  /// @notice Deploys a PRB proxy and plugin that returns tokens to this address
+  /// @dev See https://docs.sablier.com/contracts/v2/guides/proxy-architecture/deploy
+  /// @return _proxy {IPRBProxy} proxy address
+  function deployProxyAndInstallPlugin() internal returns (IPRBProxy) {
+    // Get the proxy for this contract
+    IPRBProxy _proxy = PROXY_REGISTRY.getProxy({user: address(this)});
+    if (address(_proxy) == address(0)) {
+      // If a proxy doesn't exist, deploy one and install the plugin
+      _proxy = PROXY_REGISTRY.deployAndInstallPlugin({plugin: proxyPlugin});
+    } else {
+      // If the proxy exists, then just install the plugin.
+      PROXY_REGISTRY.installPlugin({plugin: proxyPlugin});
+    }
+    proxy = _proxy;
+    return _proxy;
+  }
+
+  /// @notice Deploys streams for each stream type defined by user
+  /// @dev See https://docs.sablier.com/contracts/v2/guides/proxy-architecture/batch-stream
+  /// @param _data see {AddStreamsData} from "../structs/Streams.sol";
+  function _deployStreams(AddStreamsData memory _data, uint256 _cycleNumber) internal {
+    if (IERC20(_data.token).balanceOf(address(this)) < _data.total)
+      revert JBSablier_InsufficientBalance();
+
+    // Check if PRBProxy has been setup
+    if (address(proxy) == address(0)) deployProxyAndInstallPlugin();
+
+    // Approve tokens for transfer
+    _data.token.approve({spender: address(PERMIT2), amount: type(uint256).max});
+
+    // Encode and proxy.execute with data for the proxy target call if user defined each *stream type*
+    if (_data.linWithDur.length > 0) {
+      bytes memory data = abi.encodeCall(
+        proxyTarget.batchCreateWithDurations,
+        (lockupLinear, _data.token, _data.linWithDur, _issueNewPermit(_data.token, proxy))
+      );
+
+      // Create a batch of Lockup Linear streams via the proxy and Sablier's proxy target
+      bytes memory response = proxy.execute(address(proxyTarget), data);
+      uint256[] memory streamIds = abi.decode(response, (uint256[]));
+
+      for (uint256 i; i < streamIds.length; i++) {
+        address user = _data.linWithDur[i].recipient;
+        uint256 id = streamIds[i];
+        streamsByCycleAndAddress[_cycleNumber][user].push(id);
+        emit StreamForUser(user, id);
+      }
+    }
+
+    if (_data.linWithRange.length > 0) {
+      bytes memory data = abi.encodeCall(
+        proxyTarget.batchCreateWithRange,
+        (lockupLinear, _data.token, _data.linWithRange, _issueNewPermit(_data.token, proxy))
+      );
+
+      bytes memory response = proxy.execute(address(proxyTarget), data);
+      uint256[] memory streamIds = abi.decode(response, (uint256[]));
+
+      for (uint256 i; i < streamIds.length; i++) {
+        address user = _data.linWithRange[i].recipient;
+        uint256 id = streamIds[i];
+        streamsByCycleAndAddress[_cycleNumber][user].push(id);
+        emit StreamForUser(user, id);
+      }
+    }
+
+    if (_data.dynWithDelta.length > 0) {
+      bytes memory data = abi.encodeCall(
+        proxyTarget.batchCreateWithDeltas,
+        (lockupDynamic, _data.token, _data.dynWithDelta, _issueNewPermit(_data.token, proxy))
+      );
+
+      bytes memory response = proxy.execute(address(proxyTarget), data);
+      uint256[] memory streamIds = abi.decode(response, (uint256[]));
+
+      for (uint256 i; i < streamIds.length; i++) {
+        address user = _data.dynWithDelta[i].recipient;
+        uint256 id = streamIds[i];
+        streamsByCycleAndAddress[_cycleNumber][user].push(id);
+        emit StreamForUser(user, id);
+      }
+    }
+
+    if (_data.dynWithMiles.length > 0) {
+      bytes memory data = abi.encodeCall(
+        proxyTarget.batchCreateWithMilestones,
+        (lockupDynamic, _data.token, _data.dynWithMiles, _issueNewPermit(_data.token, proxy))
+      );
+
+      bytes memory response = proxy.execute(address(proxyTarget), data);
+      uint256[] memory streamIds = abi.decode(response, (uint256[]));
+
+      for (uint256 i; i < streamIds.length; i++) {
+        address user = _data.dynWithMiles[i].recipient;
+        uint256 id = streamIds[i];
+        streamsByCycleAndAddress[_cycleNumber][user].push(id);
+        emit StreamForUser(user, id);
+      }
+    }
+  }
+
+  //*********************************************************************//
+  // --------------------------- mapping getters ----------------------- //
+  //*********************************************************************//
+
+  function getStreamsByCycleAndAddress(
+    uint256 cycleNumber,
+    address user
+  ) public view returns (uint256[] memory) {
+    return streamsByCycleAndAddress[cycleNumber][user];
   }
 
   //*********************************************************************//
@@ -191,89 +316,6 @@ abstract contract JBSablier is ERC165, ERC1271, IUniswapV3SwapCallback {
   }
 
   //*********************************************************************//
-  // ----------------------------- Proxy ------------------------------- //
-  //*********************************************************************//
-
-  /// @notice Deploys a PRB proxy and plugin that returns tokens to this address
-  /// @dev See https://docs.sablier.com/contracts/v2/guides/proxy-architecture/deploy
-  /// @return _proxy {IPRBProxy} proxy address
-  function deployProxyAndInstallPlugin() public returns (IPRBProxy) {
-    // Get the proxy for this contract
-    IPRBProxy _proxy = PROXY_REGISTRY.getProxy({user: address(this)});
-    if (address(_proxy) == address(0)) {
-      // If a proxy doesn't exist, deploy one and install the plugin
-      _proxy = PROXY_REGISTRY.deployAndInstallPlugin({plugin: proxyPlugin});
-    } else {
-      // If the proxy exists, then just install the plugin.
-      PROXY_REGISTRY.installPlugin({plugin: proxyPlugin});
-    }
-    proxy = _proxy;
-    return _proxy;
-  }
-
-  /// @notice Deploys streams for each stream type defined by user
-  /// @dev See https://docs.sablier.com/contracts/v2/guides/proxy-architecture/batch-stream
-  /// @param _data see {AddStreamsData} from "../structs/Streams.sol";
-  /// @return streams {DeployedStreams} a struct that carries the cycleNumber, and streamIds deployed via Sablier v2
-  function _deployStreams(AddStreamsData memory _data) internal returns (DeployedStreams memory) {
-    if (IERC20(_data.token).balanceOf(address(this)) < _data.total)
-      revert JBSablier_InsufficientBalance();
-
-    // Check if PRBProxy has been setup
-    if (address(proxy) == address(0)) deployProxyAndInstallPlugin();
-
-    // Approve tokens for transfer
-    _data.token.approve({spender: address(PERMIT2), amount: type(uint160).max});
-
-    // Returned after execution for accounting
-    DeployedStreams memory streams;
-
-    // Encode and proxy.execute with data for the proxy target call if user defined each *stream type*
-    if (_data.linWithDur.length > 0) {
-      bytes memory data = abi.encodeCall(
-        proxyTarget.batchCreateWithDurations,
-        (lockupLinear, _data.token, _data.linWithDur, _issueNewPermit(_data.token, proxy))
-      );
-
-      // Create a batch of Lockup Linear streams via the proxy and Sablier's proxy target
-      bytes memory response = proxy.execute(address(proxyTarget), data);
-      streams.linearDurStreams = abi.decode(response, (uint256[]));
-    }
-
-    if (_data.linWithRange.length > 0) {
-      bytes memory data = abi.encodeCall(
-        proxyTarget.batchCreateWithRange,
-        (lockupLinear, _data.token, _data.linWithRange, _issueNewPermit(_data.token, proxy))
-      );
-
-      bytes memory response = proxy.execute(address(proxyTarget), data);
-      streams.linearRangeStreams = abi.decode(response, (uint256[]));
-    }
-
-    if (_data.dynWithDelta.length > 0) {
-      bytes memory data = abi.encodeCall(
-        proxyTarget.batchCreateWithDeltas,
-        (lockupDynamic, _data.token, _data.dynWithDelta, _issueNewPermit(_data.token, proxy))
-      );
-
-      bytes memory response = proxy.execute(address(proxyTarget), data);
-      streams.dynDeltaStreams = abi.decode(response, (uint256[]));
-    }
-
-    if (_data.dynWithMiles.length > 0) {
-      bytes memory data = abi.encodeCall(
-        proxyTarget.batchCreateWithMilestones,
-        (lockupDynamic, _data.token, _data.dynWithMiles, _issueNewPermit(_data.token, proxy))
-      );
-
-      bytes memory response = proxy.execute(address(proxyTarget), data);
-      streams.dynMileStreams = abi.decode(response, (uint256[]));
-    }
-
-    return streams;
-  }
-
-  //*********************************************************************//
   // ----------------------- Uniswap Functions ------------------------- //
   //*********************************************************************//
 
@@ -281,7 +323,7 @@ abstract contract JBSablier is ERC165, ERC1271, IUniswapV3SwapCallback {
   /// @dev See https://docs.sablier.com/contracts/v2/guides/proxy-architecture/overview
   /// @param _token Our token as an IERC20
   /// @param _proxy Our proxy assigned to this contract
-  /// @return Permit2Params The new permit params, which should include a new nonce, as this is called in succession of a proxy.execute()
+  /// @return Permit2Params The new permit params with a new nonce
   function _issueNewPermit(
     IERC20 _token,
     IPRBProxy _proxy
@@ -410,5 +452,4 @@ abstract contract JBSablier is ERC165, ERC1271, IUniswapV3SwapCallback {
     WETH.deposit{value: _amountToSendToPool}();
     WETH.transfer(address(POOL), _amountToSendToPool);
   }
-  
 }

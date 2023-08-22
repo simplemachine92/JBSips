@@ -12,11 +12,3 @@ struct AddStreamsData {
   Batch.CreateWithDeltas[] dynWithDelta;
   Batch.CreateWithMilestones[] dynWithMiles;
 }
-
-struct DeployedStreams {
-  uint256 cycleNumber;
-  uint256[] linearDurStreams;
-  uint256[] linearRangeStreams;
-  uint256[] dynDeltaStreams;
-  uint256[] dynMileStreams;
-}
