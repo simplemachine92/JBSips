@@ -2,6 +2,7 @@
   "extends": "solhint:recommended",
   "plugins": ["prettier"],
   "rules": {
+    "code-complexity": "off",
     "prettier/prettier": "error",
     "compiler-version": ["off"],
     "constructor-syntax": "warn",

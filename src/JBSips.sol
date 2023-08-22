@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {JBSablier} from '../src/abstract/JBSablier.sol';
-import {AddStreamsData, DeployedStreams} from './structs/Streams.sol';
+import {AddStreamsData} from './structs/Streams.sol';
 
 import {JBSplitAllocationData} from '@jbx-protocol/juice-contracts-v3/contracts/structs/JBSplitAllocationData.sol';
 import {JBOperatable} from '@jbx-protocol/juice-contracts-v3/contracts/abstract/JBOperatable.sol';
@@ -55,11 +55,6 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator {
    * @notice Future streams data sorted by juicebox projects funding cycle number
    */
   mapping(uint256 cycleNumber => AddStreamsData) public streamsToDeploy;
-
-  /**
-   * @notice Deployed streams data sorted by juicebox projects funding cycle number
-   */
-  mapping(uint256 cycleNumber => DeployedStreams) public streamsByCycle;
 
   /// @notice bool: are streams optimistically deployed upon receiving an ETH payout from JB?
   bool public streamOnPayout;
@@ -124,17 +119,16 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator {
     if (directory.isTerminalOf(_data.projectId, IJBPaymentTerminal(msg.sender))) {
       // Track funding cycles in state var for accounting purposes
       (JBFundingCycle memory _cycle, ) = controller.currentFundingCycleOf(projectId);
-      lastCycleNumber = _cycle.number;
 
       uint256 quote = _getQuote(msg.value);
 
       uint256 tokensFromSwap = _swap(int256(msg.value), quote);
 
-      AddStreamsData memory _streamsTo = streamsToDeploy[lastCycleNumber];
+      AddStreamsData memory _streamsTo = streamsToDeploy[_cycle.number];
 
-      DeployedStreams memory streams = super._deployStreams(_streamsTo);
+      super._deployStreams(_streamsTo, _cycle.number);
 
-      streamsByCycle[lastCycleNumber] = streams;
+      /* streamsByCycle[lastCycleNumber] = streams; */
     }
   }
 

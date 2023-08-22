@@ -30,14 +30,14 @@ import {IUniswapV3Pool} from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Po
 import {IUniswapV3SwapCallback} from "@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol";
 import {TickMath} from "@uniswap/v3-core/contracts/libraries/TickMath.sol";
 
-import {AddStreamsData, DeployedStreams} from "../src/structs/Streams.sol";
+import {AddStreamsData} from "../src/structs/Streams.sol";
 import {IPRBProxy, IPRBProxyRegistry} from "@sablier/v2-periphery/src/types/Proxy.sol";
 
 import {Test, console2} from "forge-std/Test.sol";
 
 contract SipsTest is TestBaseWorkflowV3 {
-
     using JBFundingCycleMetadataResolver for JBFundingCycle;
+    using stdStorage for StdStorage;
 
     // Assigned when project is launched
     uint256 _projectId;
@@ -210,15 +210,15 @@ contract SipsTest is TestBaseWorkflowV3 {
 
         durBatch[0] = stream0;
 
-                // Declare the params struct
+        // Declare the params struct
         Batch.CreateWithMilestones memory stream1;
 
         // Declare the second stream
-        Batch.CreateWithMilestones[] memory mileBatch = new Batch.CreateWithMilestones[](1);
+        Batch.CreateWithMilestones[] memory mileBatch = new Batch.CreateWithMilestones[](2);
 
         // Declare the function parameters
         stream1.sender = address(_proxy); // The sender will be able to cancel the stream
-        stream1.recipient = address(0xcafe2); // The recipient of the streamed assets
+        stream1.recipient = address(0xcafe); // The recipient of the streamed assets
         stream1.totalAmount = uint128(800000000); // Total amount is the amount inclusive of all fees
         /* stream1.asset = USDC; // The streaming asset */
         stream1.cancelable = true; // Whether the stream will be cancelable or not
@@ -241,6 +241,35 @@ contract SipsTest is TestBaseWorkflowV3 {
         );
 
         mileBatch[0] = stream1;
+
+        // Declare the params struct
+        Batch.CreateWithMilestones memory stream3;
+
+        // Declare the function parameters
+        stream3.sender = address(_proxy); // The sender will be able to cancel the stream
+        stream3.recipient = address(0xcafe3); // The recipient of the streamed assets
+        stream3.totalAmount = uint128(800000000); // Total amount is the amount inclusive of all fees
+        /* stream1.asset = USDC; // The streaming asset */
+        stream3.cancelable = true; // Whether the stream will be cancelable or not
+        /* stream1.startTime = uint40(block.timestamp); */
+        stream3.broker = Broker(address(0), ud60x18(0)); // Optional parameter left undefined
+
+        // Declare some dummy segments
+        stream3.segments = new LockupDynamic.Segment[](2);
+        stream3.segments[0] = LockupDynamic.Segment({
+            amount: uint128(400000000),
+            exponent: ud2x18(1e18),
+            milestone: uint40(block.timestamp + 4 weeks)
+        });
+        stream3.segments[1] = (
+            LockupDynamic.Segment({
+                amount: uint128(400000000),
+                exponent: ud2x18(3.14e18),
+                milestone: uint40(block.timestamp + 52 weeks)
+            })
+        );
+
+        mileBatch[1] = stream3;
 
          Batch.CreateWithRange[] memory _range = new Batch.CreateWithRange[](0);
          Batch.CreateWithDeltas[] memory _deltas = new Batch.CreateWithDeltas[](0);
@@ -267,6 +296,11 @@ contract SipsTest is TestBaseWorkflowV3 {
         _jbETHPaymentTerminal.distributePayoutsOf(_projectId, 2 ether, 1, address(0x000000000000000000000000000000000000EEEe), 0, "");
         emit log_uint(USDC.balanceOf(address(_sips)));
 
+       // Since we've forked mainnet, we can't really expect specific values, but there should be 2 stream ids 
+       uint256[] memory ids = _sips.getStreamsByCycleAndAddress(1, 0x000000000000000000000000000000000000cafE);
+
+       // Ensure that cafE has 2 streams deployed for accounting purposes
+       assertEq(ids.length, 2);
     }
 
     function testPayout() public {
