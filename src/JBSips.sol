@@ -164,12 +164,11 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator {
   }
 
   /// @notice Withdraws ETH..
-  function withdrawETH(
-  )
+  function withdrawETH()
     external
     requirePermission(controller.projects().ownerOf(projectId), projectId, JBOperations.SET_SPLITS)
   {
-    (bool sent,) = msg.sender.call{value: address(this).balance}('');
+    (bool sent, ) = msg.sender.call{value: address(this).balance}('');
     require(sent, 'Failed to send Ether');
   }
 
