@@ -57,7 +57,7 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator {
    * @notice Future streams data sorted by juicebox projects funding cycle number
    */
   mapping(uint256 cycleNumber => AddStreamsData) public streamsToDeploy;
- 
+
   /// @notice are payout funds swapped when received?
   bool public swapOnPayout;
 
@@ -119,13 +119,11 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator {
 
     // Logic for handling ETH payouts
     if (directory.isTerminalOf(_data.projectId, IJBPaymentTerminal(msg.sender))) {
-
       if (swapOnPayout) {
-      uint256 quote = _getQuote(msg.value);
+        uint256 quote = _getQuote(msg.value);
 
-      _swap(int256(msg.value), quote);
+        _swap(int256(msg.value), quote);
       }
-
     }
   }
 
@@ -167,7 +165,10 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator {
   }
 
   /// @notice Withdraws specified amount of token dust from this contract to caller
-  function withdrawTokenDust(IERC20 _token, uint256 _amount)
+  function withdrawTokenDust(
+    IERC20 _token,
+    uint256 _amount
+  )
     external
     requirePermission(controller.projects().ownerOf(projectId), projectId, JBOperations.SET_SPLITS)
   {
@@ -175,7 +176,9 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator {
   }
 
   /// @notice Withdraws all token dust of token from this contract to caller
-  function withdrawAllTokenDust(IERC20 _token)
+  function withdrawAllTokenDust(
+    IERC20 _token
+  )
     external
     requirePermission(controller.projects().ownerOf(projectId), projectId, JBOperations.SET_SPLITS)
   {
@@ -183,8 +186,9 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator {
   }
 
   /// @notice Toggle swapping eth on payout received
-  function toggleAutoSwaps() external
-    requirePermission(controller.projects().ownerOf(projectId), projectId, JBOperations.SET_SPLITS) 
+  function toggleAutoSwaps()
+    external
+    requirePermission(controller.projects().ownerOf(projectId), projectId, JBOperations.SET_SPLITS)
   {
     swapOnPayout = !swapOnPayout;
   }
