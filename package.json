@@ -6,7 +6,7 @@
     "solhint-plugin-prettier": "^0.0.5"
   },
   "scripts": {
-    "pretty": "prettier --write \"./src/**/*.{js,jsx,json,sol}\""
+    "pretty": "prettier --write \"./src/**/*.{js,jsx,json,sol}\" \"./test/**/*.{js,jsx,json,sol}\""
   },
   "dependencies": {
     "@jbx-protocol/juice-contracts-v3": "^5.0.0",
