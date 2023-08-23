@@ -126,7 +126,7 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator {
   }
 
   //*********************************************************************//
-  // ----------------------- admin functions --------------------------- //
+  // ---------------------- stream management -------------------------- //
   //*********************************************************************//
 
   /// @notice Deploys PRBProxy and plugin via JBSablier
@@ -173,10 +173,14 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator {
         (_batch, _assets)
       );
 
-      // Create a batch of Lockup Linear streams via the proxy and Sablier's proxy target
-      bytes memory response = proxy.execute(address(proxyTarget), data);
-      /* uint256[] memory streamIds = abi.decode(response, (uint256[])); */
+      proxy.execute(address(proxyTarget), data);
   }
+
+  //*********************************************************************//
+  // ----------------------- admin functions --------------------------- //
+  //*********************************************************************//
+
+  
 
   /// @notice Withdraws ETH..
   function withdrawETH()

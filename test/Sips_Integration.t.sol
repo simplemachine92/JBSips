@@ -33,12 +33,12 @@ import {TickMath} from '@uniswap/v3-core/contracts/libraries/TickMath.sol';
 
 import {AddStreamsData} from '../src/structs/Streams.sol';
 import {IPRBProxy, IPRBProxyRegistry} from '@sablier/v2-periphery/src/types/Proxy.sol';
+import { Lockup } from 'lib/v2-periphery/lib/v2-core/src/types/DataTypes.sol';
 
 import {Test, console2} from 'forge-std/Test.sol';
 
-contract SipsTest is TestBaseWorkflowV3 {
+contract SipsTest_Int is TestBaseWorkflowV3 {
   using JBFundingCycleMetadataResolver for JBFundingCycle;
-  using stdStorage for StdStorage;
 
   // Assigned when project is launched
   uint256 _projectId;
@@ -314,12 +314,12 @@ contract SipsTest is TestBaseWorkflowV3 {
     _sips.swapAndDeployStreams(3 ether, _sData);
   }
 
-  function testWithdrawAllDust() public {
+  function test_WithdrawAllDust() public {
     vm.prank(address(123));
     _sips.withdrawAllTokenDust(USDC);
   }
 
-  function testBatchCancelStreams() public {
+  function test_BatchCancelStreams() public {
     // Arrange our data for proxy call of batchCancelMultiple
     uint256[] memory _ids = new uint256[](1);
     uint256[] memory ids = _sips.getStreamsByCycleAndAddress(
@@ -340,15 +340,20 @@ contract SipsTest is TestBaseWorkflowV3 {
 
     batch[0] = stream1;
 
+    vm.warp(block.timestamp + 1 weeks);
+
     // Cancel the stream
     vm.startPrank(address(123));
     _sips.batchCancelStreams(batch, tokens);
 
-    // Ensure cancelled stream tokens were refunded to sips contract
-    _sips.withdrawAllTokenDust(USDC);
+    Lockup.Status expectedStatus = Lockup.Status.CANCELED;
+    Lockup.Status actualLinearStatus = lockupLinear.statusOf(stream1.streamIds[0]);
+    if (expectedStatus != actualLinearStatus){
+      revert();
+    }
   }
 
-  function testStreamWithdraw() public {
+  function test_StreamWithdraw() public {
     // Since we've forked mainnet, we can't really expect specific values, but there should be 2 stream ids
     uint256[] memory ids = _sips.getStreamsByCycleAndAddress(
       1,
@@ -394,7 +399,7 @@ contract SipsTest is TestBaseWorkflowV3 {
     _sips.deployProxy();
   }
 
-  function testPoolValidity() public {
+  function test_PoolValidity() public {
     emit log_address(address(_sips.POOL()));
   }
 }
