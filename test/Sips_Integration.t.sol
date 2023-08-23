@@ -15,6 +15,7 @@ import {ISablierV2ProxyPlugin} from '@sablier/v2-periphery/src/interfaces/ISabli
 import {ISablierV2ProxyTarget} from '@sablier/v2-periphery/src/interfaces/ISablierV2ProxyTarget.sol';
 import {LockupLinear, LockupDynamic} from '@sablier/v2-periphery/src/types/DataTypes.sol';
 import {Batch, Broker} from '@sablier/v2-periphery/src/types/DataTypes.sol';
+import { ISablierV2Lockup } from "@sablier/v2-core/src/interfaces/ISablierV2Lockup.sol";
 import {ud2x18, ud60x18} from '@sablier/v2-core/src/types/Math.sol';
 
 import {IJBDelegatesRegistry} from '@jbx-protocol/juice-delegates-registry/src/interfaces/IJBDelegatesRegistry.sol';
@@ -315,6 +316,35 @@ contract SipsTest is TestBaseWorkflowV3 {
 
   function testWithdrawAllDust() public {
     vm.prank(address(123));
+    _sips.withdrawAllTokenDust(USDC);
+  }
+
+  function testBatchCancelStreams() public {
+    // Arrange our data for proxy call of batchCancelMultiple
+    uint256[] memory _ids = new uint256[](1);
+    uint256[] memory ids = _sips.getStreamsByCycleAndAddress(
+      1,
+      0x000000000000000000000000000000000000cafE
+    );
+    _ids[0] = ids[0];
+
+    Batch.CancelMultiple memory stream1;
+    Batch.CancelMultiple[] memory batch = new Batch.CancelMultiple[](1);
+
+    IERC20[] memory tokens = new IERC20[](1);
+
+    tokens[0] = USDC;
+    
+    stream1.streamIds = _ids;
+    _sips.isStreamLinear(ids[0]) ? stream1.lockup = lockupLinear : stream1.lockup = lockupDynamic;
+
+    batch[0] = stream1;
+
+    // Cancel the stream
+    vm.startPrank(address(123));
+    _sips.batchCancelStreams(batch, tokens);
+
+    // Ensure cancelled stream tokens were refunded to sips contract
     _sips.withdrawAllTokenDust(USDC);
   }
 

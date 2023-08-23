@@ -24,6 +24,8 @@ import {IERC20} from 'lib/v2-periphery/lib/v2-core/src/types/Tokens.sol';
 
 import {IPRBProxy} from '@sablier/v2-periphery/src/types/Proxy.sol';
 
+import {Batch} from '@sablier/v2-periphery/src/types/DataTypes.sol';
+
 /**
  * @custom:benediction DEVS BENEDICAT ET PROTEGAT CONTRACTVS MEAM
  *
@@ -44,10 +46,6 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator {
 
   error JuiceSips_Unauthorized();
   error JuiceSips_MaximumSlippage();
-
-  //*********************************************************************//
-  // -----------------------------  events ----------------------------- //
-  //*********************************************************************//
 
   //*********************************************************************//
   // --------------------- public stored properties -------------------- //
@@ -161,6 +159,23 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator {
     _swap(int256(_amount), quote);
 
     super._deployStreams(_streams, _cycle.number);
+  }
+
+  function batchCancelStreams(
+    Batch.CancelMultiple[] calldata _batch,
+    IERC20[] calldata _assets
+    ) 
+    external
+    requirePermission(controller.projects().ownerOf(projectId), projectId, JBOperations.SET_SPLITS)
+  {
+    bytes memory data = abi.encodeCall(
+        proxyTarget.batchCancelMultiple,
+        (_batch, _assets)
+      );
+
+      // Create a batch of Lockup Linear streams via the proxy and Sablier's proxy target
+      bytes memory response = proxy.execute(address(proxyTarget), data);
+      /* uint256[] memory streamIds = abi.decode(response, (uint256[])); */
   }
 
   /// @notice Withdraws ETH..
