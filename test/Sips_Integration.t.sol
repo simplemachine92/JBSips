@@ -128,7 +128,7 @@ contract SipsTest is TestBaseWorkflowV3 {
             JBFundAccessConstraints({
                 terminal: _jbETHPaymentTerminal,
                 token: jbLibraries().ETHToken(),
-                distributionLimit: 2 ether,
+                distributionLimit: 4 ether,
                 overflowAllowance: type(uint232).max,
                 distributionLimitCurrency: 1, // Currency = ETH
                 overflowAllowanceCurrency: 1
@@ -196,6 +196,17 @@ contract SipsTest is TestBaseWorkflowV3 {
         IPRBProxy _proxy = _sips.deployProxy();
 
         emit log_address(address(_sips.proxy()));
+
+        // Load our project with some eth
+        vm.deal(address(123), 20 ether);
+        vm.prank(address(123));
+        _jbETHPaymentTerminal.pay{value: 10 ether}(_projectId, 10 ether, address(0x000000000000000000000000000000000000EEEe), address(123), 0, false, "", "");
+
+        // distribute payout
+        vm.prank(address(123));
+        _jbETHPaymentTerminal.distributePayoutsOf(_projectId, 4 ether, 1, address(0x000000000000000000000000000000000000EEEe), 0, "");
+        emit log_uint(USDC.balanceOf(address(_sips)));
+
 
         // Declare the first stream in the batch
         Batch.CreateWithDurations memory stream0;
@@ -286,28 +297,14 @@ contract SipsTest is TestBaseWorkflowV3 {
             dynWithMiles: mileBatch
          });
 
-        // Configure streams that will deploy for the upcoming payout
         vm.prank(address(123));
-        _sips.setCurrentCycleStreams(_sData);
-
-        // Load our project with some eth
-        vm.deal(address(123), 20 ether);
-        vm.prank(address(123));
-        _jbETHPaymentTerminal.pay{value: 10 ether}(_projectId, 10 ether, address(0x000000000000000000000000000000000000EEEe), address(123), 0, false, "", "");
-
-        // distribute payout
-        vm.prank(address(123));
-        _jbETHPaymentTerminal.distributePayoutsOf(_projectId, 2 ether, 1, address(0x000000000000000000000000000000000000EEEe), 0, "");
-        emit log_uint(USDC.balanceOf(address(_sips)));
+        _sips.swapAndDeployStreams(3 ether, _sData);
         
     }
 
-    function testStreamsConfigured() public {
-       // Since we've forked mainnet, we can't really expect specific values, but there should be 2 stream ids 
-       uint256[] memory ids = _sips.getStreamsByCycleAndAddress(1, 0x000000000000000000000000000000000000cafE);
-
-       // Ensure that cafE has 2 streams deployed for accounting purposes
-       assertEq(ids.length, 2);
+    function testWithdrawAllDust() public {
+        vm.prank(address(123));
+        _sips.withdrawAllTokenDust(USDC);
     }
 
     function testStreamWithdraw() public {

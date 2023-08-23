@@ -57,9 +57,9 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator {
    * @notice Future streams data sorted by juicebox projects funding cycle number
    */
   mapping(uint256 cycleNumber => AddStreamsData) public streamsToDeploy;
-
-  /// @notice bool: are streams optimistically deployed upon receiving an ETH payout from JB?
-  bool public streamOnPayout;
+ 
+  /// @notice are payout funds swapped when received?
+  bool public swapOnPayout;
 
   /// @notice the last logged cycle number via allocate
   uint256 public lastCycleNumber;
@@ -119,35 +119,23 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator {
 
     // Logic for handling ETH payouts
     if (directory.isTerminalOf(_data.projectId, IJBPaymentTerminal(msg.sender))) {
-      // Track funding cycles in state var for accounting purposes
-      (JBFundingCycle memory _cycle, ) = controller.currentFundingCycleOf(projectId);
 
+      if (swapOnPayout) {
       uint256 quote = _getQuote(msg.value);
 
-      /* uint256 tokensFromSwap =  */ _swap(int256(msg.value), quote);
+      _swap(int256(msg.value), quote);
+      }
 
-      AddStreamsData memory _streamsTo = streamsToDeploy[_cycle.number];
-
-      super._deployStreams(_streamsTo, _cycle.number);
     }
   }
 
-  /// @notice Sets any number of streams to be deployed upon a projects funding cycle payout
-  /// @dev See https://docs.sablier.com/concepts/protocol/stream-types
-  /// @param _streams {AddStreamsData} Struct that includes cycle #, token & total, stream configs
-  function setCurrentCycleStreams(
-    AddStreamsData calldata _streams
-  )
-    external
-    requirePermission(controller.projects().ownerOf(projectId), projectId, JBOperations.SET_SPLITS)
-  {
-    // Track funding cycles in state var for accounting purposes
-    (JBFundingCycle memory _cycle, ) = controller.currentFundingCycleOf(projectId);
-    uint256 cycleNumber = _cycle.number;
+  //*********************************************************************//
+  // ----------------------- admin functions --------------------------- //
+  //*********************************************************************//
 
-    streamsToDeploy[cycleNumber] = _streams;
-  }
-
+  /// @notice Deploys PRBProxy and plugin via JBSablier
+  /// @dev See https://docs.sablier.com/contracts/v2/guides/proxy-architecture/deploy
+  /// @return proxy {IPRBProxy} proxy address
   function deployProxy()
     external
     requirePermission(controller.projects().ownerOf(projectId), projectId, JBOperations.SET_SPLITS)
@@ -157,10 +145,49 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator {
     return proxy;
   }
 
-  //*********************************************************************//
-  // ----------------------- admin functions --------------------------- //
-  //*********************************************************************//
+  /// @notice Sets any number of streams to be deployed upon a projects funding cycle payout
+  /// @dev See https://docs.sablier.com/concepts/protocol/stream-types
+  /// @param _streams {AddStreamsData} Struct that includes cycle #, token & total, stream configs
+  function swapAndDeployStreams(
+    uint256 _amount,
+    AddStreamsData calldata _streams
+  )
+    external
+    requirePermission(controller.projects().ownerOf(projectId), projectId, JBOperations.SET_SPLITS)
+  {
+    // Track funding cycles in state var for accounting purposes
+    (JBFundingCycle memory _cycle, ) = controller.currentFundingCycleOf(projectId);
+    uint256 cycleNumber = _cycle.number;
 
+    uint256 quote = _getQuote(_amount);
+
+    _swap(int256(_amount), quote);
+
+    super._deployStreams(_streams, _cycle.number);
+  }
+
+  /// @notice Withdraws specified amount of token dust from this contract to caller
+  function withdrawTokenDust(IERC20 _token, uint256 _amount)
+    external
+    requirePermission(controller.projects().ownerOf(projectId), projectId, JBOperations.SET_SPLITS)
+  {
+    _token.transfer(msg.sender, _amount);
+  }
+
+  /// @notice Withdraws all token dust of token from this contract to caller
+  function withdrawAllTokenDust(IERC20 _token)
+    external
+    requirePermission(controller.projects().ownerOf(projectId), projectId, JBOperations.SET_SPLITS)
+  {
+    _token.transfer(msg.sender, _token.balanceOf(address(this)));
+  }
+
+  /// @notice Toggle swapping eth on payout received
+  function toggleAutoSwaps() external
+    requirePermission(controller.projects().ownerOf(projectId), projectId, JBOperations.SET_SPLITS) 
+  {
+    swapOnPayout = !swapOnPayout;
+  }
 
   receive() external payable {}
 }
