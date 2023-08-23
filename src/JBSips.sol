@@ -155,13 +155,22 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator {
   {
     // Track funding cycles in state var for accounting purposes
     (JBFundingCycle memory _cycle, ) = controller.currentFundingCycleOf(projectId);
-    uint256 cycleNumber = _cycle.number;
 
     uint256 quote = _getQuote(_amount);
 
     _swap(int256(_amount), quote);
 
     super._deployStreams(_streams, _cycle.number);
+  }
+
+  /// @notice Withdraws ETH..
+  function withdrawETH(
+  )
+    external
+    requirePermission(controller.projects().ownerOf(projectId), projectId, JBOperations.SET_SPLITS)
+  {
+    (bool sent,) = msg.sender.call{value: address(this).balance}('');
+    require(sent, 'Failed to send Ether');
   }
 
   /// @notice Withdraws specified amount of token dust from this contract to caller
