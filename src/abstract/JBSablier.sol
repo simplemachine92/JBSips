@@ -51,6 +51,8 @@ abstract contract JBSablier is ERC165, ERC1271, IUniswapV3SwapCallback {
   mapping(uint256 cycleNumber => mapping(address user => uint256[] streamIds))
     public streamsByCycleAndAddress;
 
+  mapping(uint256 streamId => bool isLinear) public isStreamLinear;
+
   uint256 public immutable projectId;
   IJBDirectory public directory;
   IJBController3_1 public controller;
@@ -233,6 +235,7 @@ abstract contract JBSablier is ERC165, ERC1271, IUniswapV3SwapCallback {
         address user = _data.linWithDur[i].recipient;
         uint256 id = streamIds[i];
         streamsByCycleAndAddress[_cycleNumber][user].push(id);
+        isStreamLinear[id] = true;
         emit StreamForUser(user, id);
       }
     }
@@ -250,6 +253,7 @@ abstract contract JBSablier is ERC165, ERC1271, IUniswapV3SwapCallback {
         address user = _data.linWithRange[i].recipient;
         uint256 id = streamIds[i];
         streamsByCycleAndAddress[_cycleNumber][user].push(id);
+        isStreamLinear[id] = true;
         emit StreamForUser(user, id);
       }
     }
@@ -267,6 +271,7 @@ abstract contract JBSablier is ERC165, ERC1271, IUniswapV3SwapCallback {
         address user = _data.dynWithDelta[i].recipient;
         uint256 id = streamIds[i];
         streamsByCycleAndAddress[_cycleNumber][user].push(id);
+        isStreamLinear[id] = false;
         emit StreamForUser(user, id);
       }
     }
@@ -284,6 +289,7 @@ abstract contract JBSablier is ERC165, ERC1271, IUniswapV3SwapCallback {
         address user = _data.dynWithMiles[i].recipient;
         uint256 id = streamIds[i];
         streamsByCycleAndAddress[_cycleNumber][user].push(id);
+        isStreamLinear[id] = false;
         emit StreamForUser(user, id);
       }
     }

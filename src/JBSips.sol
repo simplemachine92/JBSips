@@ -24,6 +24,8 @@ import {IERC20} from 'lib/v2-periphery/lib/v2-core/src/types/Tokens.sol';
 
 import {IPRBProxy} from '@sablier/v2-periphery/src/types/Proxy.sol';
 
+import {Batch} from '@sablier/v2-periphery/src/types/DataTypes.sol';
+
 /**
  * @custom:benediction DEVS BENEDICAT ET PROTEGAT CONTRACTVS MEAM
  *
@@ -44,10 +46,6 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator {
 
   error JuiceSips_Unauthorized();
   error JuiceSips_MaximumSlippage();
-
-  //*********************************************************************//
-  // -----------------------------  events ----------------------------- //
-  //*********************************************************************//
 
   //*********************************************************************//
   // --------------------- public stored properties -------------------- //
@@ -128,7 +126,7 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator {
   }
 
   //*********************************************************************//
-  // ----------------------- admin functions --------------------------- //
+  // ---------------------- stream management -------------------------- //
   //*********************************************************************//
 
   /// @notice Deploys PRBProxy and plugin via JBSablier
@@ -162,6 +160,27 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator {
 
     super._deployStreams(_streams, _cycle.number);
   }
+
+  function batchCancelStreams(
+    Batch.CancelMultiple[] calldata _batch,
+    IERC20[] calldata _assets
+    ) 
+    external
+    requirePermission(controller.projects().ownerOf(projectId), projectId, JBOperations.SET_SPLITS)
+  {
+    bytes memory data = abi.encodeCall(
+        proxyTarget.batchCancelMultiple,
+        (_batch, _assets)
+      );
+
+      proxy.execute(address(proxyTarget), data);
+  }
+
+  //*********************************************************************//
+  // ----------------------- admin functions --------------------------- //
+  //*********************************************************************//
+
+  
 
   /// @notice Withdraws ETH..
   function withdrawETH()

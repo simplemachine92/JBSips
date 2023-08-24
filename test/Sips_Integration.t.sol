@@ -15,6 +15,7 @@ import {ISablierV2ProxyPlugin} from '@sablier/v2-periphery/src/interfaces/ISabli
 import {ISablierV2ProxyTarget} from '@sablier/v2-periphery/src/interfaces/ISablierV2ProxyTarget.sol';
 import {LockupLinear, LockupDynamic} from '@sablier/v2-periphery/src/types/DataTypes.sol';
 import {Batch, Broker} from '@sablier/v2-periphery/src/types/DataTypes.sol';
+import { ISablierV2Lockup } from "@sablier/v2-core/src/interfaces/ISablierV2Lockup.sol";
 import {ud2x18, ud60x18} from '@sablier/v2-core/src/types/Math.sol';
 
 import {IJBDelegatesRegistry} from '@jbx-protocol/juice-delegates-registry/src/interfaces/IJBDelegatesRegistry.sol';
@@ -32,12 +33,12 @@ import {TickMath} from '@uniswap/v3-core/contracts/libraries/TickMath.sol';
 
 import {AddStreamsData} from '../src/structs/Streams.sol';
 import {IPRBProxy, IPRBProxyRegistry} from '@sablier/v2-periphery/src/types/Proxy.sol';
+import { Lockup } from 'lib/v2-periphery/lib/v2-core/src/types/DataTypes.sol';
 
 import {Test, console2} from 'forge-std/Test.sol';
 
-contract SipsTest is TestBaseWorkflowV3 {
+contract SipsTest_Int is TestBaseWorkflowV3 {
   using JBFundingCycleMetadataResolver for JBFundingCycle;
-  using stdStorage for StdStorage;
 
   // Assigned when project is launched
   uint256 _projectId;
@@ -313,12 +314,46 @@ contract SipsTest is TestBaseWorkflowV3 {
     _sips.swapAndDeployStreams(3 ether, _sData);
   }
 
-  function testWithdrawAllDust() public {
+  function test_WithdrawAllDust() public {
     vm.prank(address(123));
     _sips.withdrawAllTokenDust(USDC);
   }
 
-  function testStreamWithdraw() public {
+  function test_BatchCancelStreams() public {
+    // Arrange our data for proxy call of batchCancelMultiple
+    uint256[] memory _ids = new uint256[](1);
+    uint256[] memory ids = _sips.getStreamsByCycleAndAddress(
+      1,
+      0x000000000000000000000000000000000000cafE
+    );
+    _ids[0] = ids[0];
+
+    Batch.CancelMultiple memory stream1;
+    Batch.CancelMultiple[] memory batch = new Batch.CancelMultiple[](1);
+
+    IERC20[] memory tokens = new IERC20[](1);
+
+    tokens[0] = USDC;
+    
+    stream1.streamIds = _ids;
+    _sips.isStreamLinear(ids[0]) ? stream1.lockup = lockupLinear : stream1.lockup = lockupDynamic;
+
+    batch[0] = stream1;
+
+    vm.warp(block.timestamp + 1 weeks);
+
+    // Cancel the stream
+    vm.startPrank(address(123));
+    _sips.batchCancelStreams(batch, tokens);
+
+    Lockup.Status expectedStatus = Lockup.Status.CANCELED;
+    Lockup.Status actualLinearStatus = lockupLinear.statusOf(stream1.streamIds[0]);
+    if (expectedStatus != actualLinearStatus){
+      revert();
+    }
+  }
+
+  function test_StreamWithdraw() public {
     // Since we've forked mainnet, we can't really expect specific values, but there should be 2 stream ids
     uint256[] memory ids = _sips.getStreamsByCycleAndAddress(
       1,
@@ -364,7 +399,7 @@ contract SipsTest is TestBaseWorkflowV3 {
     _sips.deployProxy();
   }
 
-  function testPoolValidity() public {
+  function test_PoolValidity() public {
     emit log_address(address(_sips.POOL()));
   }
 }
