@@ -7,7 +7,6 @@ import './helpers/TestBaseWorkflowV3.sol';
 import '@jbx-protocol/juice-delegates-registry/src/JBDelegatesRegistry.sol';
 
 import {JBSips} from '../src/JBSips.sol';
-import {IJBSablier} from '../src/interfaces/IJBSablier.sol';
 import {IJBSplitAllocator} from '@jbx-protocol/juice-contracts-v3/contracts/interfaces/IJBSplitAllocator.sol';
 import {JBSplitAllocationData} from '@jbx-protocol/juice-contracts-v3/contracts/structs/JBSplitAllocationData.sol';
 
@@ -315,7 +314,7 @@ contract SipsTest_Int is TestBaseWorkflowV3 {
     });
 
     vm.prank(address(123));
-    _sips.swapAndDeployStreams(3 ether, _sData);
+    _sips.deployStreams(3 ether, _sData);
   }
 
   function test_AddWethStreams() public {
@@ -437,7 +436,7 @@ contract SipsTest_Int is TestBaseWorkflowV3 {
     );
 
     vm.prank(address(123));
-    _sips.swapAndDeployStreams(3 ether, _sData);
+    _sips.deployStreams(3 ether, _sData);
   }
 
   function test_WithdrawAllDust() public {

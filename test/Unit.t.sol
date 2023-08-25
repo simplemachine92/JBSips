@@ -7,7 +7,6 @@ import './helpers/TestBaseWorkflowV3.sol';
 import '@jbx-protocol/juice-delegates-registry/src/JBDelegatesRegistry.sol';
 
 import {JBSips} from '../src/JBSips.sol';
-import {IJBSablier} from '../src/interfaces/IJBSablier.sol';
 import {IJBSplitAllocator} from '@jbx-protocol/juice-contracts-v3/contracts/interfaces/IJBSplitAllocator.sol';
 import {JBSplitAllocationData} from '@jbx-protocol/juice-contracts-v3/contracts/structs/JBSplitAllocationData.sol';
 
@@ -277,7 +276,7 @@ contract SipsTest_Unit is TestBaseWorkflowV3 {
     });
 
     vm.prank(address(123));
-    _sips.swapAndDeployStreams(0.5 ether, _sData);
+    _sips.deployStreams(0.5 ether, _sData);
   }
 
   function test_Unit_DeployProxyAndPlugin() public {
@@ -363,7 +362,7 @@ contract SipsTest_Unit is TestBaseWorkflowV3 {
     });
 
     vm.startPrank(address(123));
-    _sips.swapAndDeployStreams(1 ether, _sData);
+    _sips.deployStreams(1 ether, _sData);
   }
 
   function test_Unit_DeploySingleStreamWETH() public {
@@ -396,7 +395,7 @@ contract SipsTest_Unit is TestBaseWorkflowV3 {
     });
 
     vm.startPrank(address(123));
-    _sips.swapAndDeployStreams(1 ether, _sData);
+    _sips.deployStreams(1 ether, _sData);
   }
 
   function test_Unit_CancelStream() public {
