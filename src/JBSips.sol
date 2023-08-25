@@ -144,7 +144,7 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator {
   /// @notice Sets any number of streams to be deployed upon a projects funding cycle payout
   /// @dev See https://docs.sablier.com/concepts/protocol/stream-types
   /// @param _streams {AddStreamsData} Struct that includes cycle #, token & total, stream configs
-  function swapAndDeployStreams(
+  function deployStreams(
     uint256 _amount,
     AddStreamsData calldata _streams
   )
