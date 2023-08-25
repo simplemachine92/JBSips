@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import "forge-std/Vm.sol";
-
+import 'forge-std/Vm.sol';
 
 import './helpers/TestBaseWorkflowV3.sol';
 import '@jbx-protocol/juice-delegates-registry/src/JBDelegatesRegistry.sol';
@@ -18,7 +17,7 @@ import {ISablierV2ProxyPlugin} from '@sablier/v2-periphery/src/interfaces/ISabli
 import {ISablierV2ProxyTarget} from '@sablier/v2-periphery/src/interfaces/ISablierV2ProxyTarget.sol';
 import {LockupLinear, LockupDynamic} from '@sablier/v2-periphery/src/types/DataTypes.sol';
 import {Batch, Broker} from '@sablier/v2-periphery/src/types/DataTypes.sol';
-import { ISablierV2Lockup } from "@sablier/v2-core/src/interfaces/ISablierV2Lockup.sol";
+import {ISablierV2Lockup} from '@sablier/v2-core/src/interfaces/ISablierV2Lockup.sol';
 import {ud2x18, ud60x18} from '@sablier/v2-core/src/types/Math.sol';
 
 import {IJBDelegatesRegistry} from '@jbx-protocol/juice-delegates-registry/src/interfaces/IJBDelegatesRegistry.sol';
@@ -36,9 +35,9 @@ import {TickMath} from '@uniswap/v3-core/contracts/libraries/TickMath.sol';
 
 import {AddStreamsData} from '../src/structs/Streams.sol';
 import {IPRBProxy, IPRBProxyRegistry} from '@sablier/v2-periphery/src/types/Proxy.sol';
-import { Lockup } from 'lib/v2-periphery/lib/v2-core/src/types/DataTypes.sol';
+import {Lockup} from 'lib/v2-periphery/lib/v2-core/src/types/DataTypes.sol';
 
-import { LockupDynamic, LockupLinear } from "@sablier/v2-core/src/types/DataTypes.sol";
+import {LockupDynamic, LockupLinear} from '@sablier/v2-core/src/types/DataTypes.sol';
 
 import {Test, console2} from 'forge-std/Test.sol';
 
@@ -421,18 +420,21 @@ contract SipsTest_Int is TestBaseWorkflowV3 {
       dynWithMiles: mileBatch
     });
 
-     LockupLinear.CreateWithDurations memory reEncoded = LockupLinear.CreateWithDurations({
-          sender: address(_sips.proxy()),
-          recipient: stream0.recipient,
-          totalAmount: stream0.totalAmount,
-          asset: weth,
-          cancelable: stream0.cancelable,
-          durations: stream0.durations,
-          broker: stream0.broker
-        });
+    LockupLinear.CreateWithDurations memory reEncoded = LockupLinear.CreateWithDurations({
+      sender: address(_sips.proxy()),
+      recipient: stream0.recipient,
+      totalAmount: stream0.totalAmount,
+      asset: weth,
+      cancelable: stream0.cancelable,
+      durations: stream0.durations,
+      broker: stream0.broker
+    });
 
     // Just checking for one call here as more would be incredibly tedious
-    vm.expectCall(address(lockupLinear), abi.encodeCall(ISablierV2LockupLinear.createWithDurations, (reEncoded)));
+    vm.expectCall(
+      address(lockupLinear),
+      abi.encodeCall(ISablierV2LockupLinear.createWithDurations, (reEncoded))
+    );
 
     vm.prank(address(123));
     _sips.swapAndDeployStreams(3 ether, _sData);
@@ -458,7 +460,7 @@ contract SipsTest_Int is TestBaseWorkflowV3 {
     IERC20[] memory tokens = new IERC20[](1);
 
     tokens[0] = USDC;
-    
+
     stream1.streamIds = _ids;
     _sips.isStreamLinear(ids[0]) ? stream1.lockup = lockupLinear : stream1.lockup = lockupDynamic;
 
@@ -472,7 +474,7 @@ contract SipsTest_Int is TestBaseWorkflowV3 {
 
     Lockup.Status expectedStatus = Lockup.Status.CANCELED;
     Lockup.Status actualLinearStatus = lockupLinear.statusOf(stream1.streamIds[0]);
-    if (expectedStatus != actualLinearStatus){
+    if (expectedStatus != actualLinearStatus) {
       revert();
     }
   }
