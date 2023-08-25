@@ -157,7 +157,10 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator {
     // Track funding cycles in state var for accounting purposes
     (JBFundingCycle memory _cycle, ) = controller.currentFundingCycleOf(projectId);
 
-    if (_streams.token == WETH) WETH.deposit{value: _amount}();
+    // If we are streaming weth, deposit our ETH
+    if (_streams.token == WETH) {WETH.deposit{value: _amount}();}
+
+    // If we are deploying streams with other tokens, swap from ETH to target token
     else { uint256 quote = _getQuote(_amount); _swap(int256(_amount), quote); }
 
     super._deployStreams(_streams, _cycle.number);
