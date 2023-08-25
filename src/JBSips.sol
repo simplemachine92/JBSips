@@ -45,6 +45,7 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator {
   //*********************************************************************//
 
   error JuiceSips_Unauthorized();
+  error JuiceSips_InvalidToken();
   error JuiceSips_MaximumSlippage();
 
   //*********************************************************************//
@@ -119,7 +120,6 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator {
     if (directory.isTerminalOf(_data.projectId, IJBPaymentTerminal(msg.sender))) {
       if (swapOnPayout) {
         uint256 quote = _getQuote(msg.value);
-
         _swap(int256(msg.value), quote);
       }
     }
@@ -151,12 +151,22 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator {
     external
     requirePermission(controller.projects().ownerOf(projectId), projectId, JBOperations.SET_SPLITS)
   {
+    // Ensure we are streaming either WETH or the target token instantiated with the contract
+    if (_streams.token != WETH && address(_streams.token) != TARGET_TOKEN)
+      revert JuiceSips_InvalidToken();
+
     // Track funding cycles in state var for accounting purposes
     (JBFundingCycle memory _cycle, ) = controller.currentFundingCycleOf(projectId);
 
-    uint256 quote = _getQuote(_amount);
-
-    _swap(int256(_amount), quote);
+    // If we are streaming weth, deposit our ETH
+    if (_streams.token == WETH) {
+      WETH.deposit{value: _amount}();
+    }
+    // If we are deploying streams with other tokens, swap from ETH to target token
+    else {
+      uint256 quote = _getQuote(_amount);
+      _swap(int256(_amount), quote);
+    }
 
     super._deployStreams(_streams, _cycle.number);
   }
@@ -164,23 +174,18 @@ contract JBSips is JBSablier, JBOperatable, IJBSplitAllocator {
   function batchCancelStreams(
     Batch.CancelMultiple[] calldata _batch,
     IERC20[] calldata _assets
-    ) 
+  )
     external
     requirePermission(controller.projects().ownerOf(projectId), projectId, JBOperations.SET_SPLITS)
   {
-    bytes memory data = abi.encodeCall(
-        proxyTarget.batchCancelMultiple,
-        (_batch, _assets)
-      );
+    bytes memory data = abi.encodeCall(proxyTarget.batchCancelMultiple, (_batch, _assets));
 
-      proxy.execute(address(proxyTarget), data);
+    proxy.execute(address(proxyTarget), data);
   }
 
   //*********************************************************************//
   // ----------------------- admin functions --------------------------- //
   //*********************************************************************//
-
-  
 
   /// @notice Withdraws ETH..
   function withdrawETH()
