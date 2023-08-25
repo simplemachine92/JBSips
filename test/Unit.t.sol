@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import "forge-std/Vm.sol";
-
-
 import './helpers/TestBaseWorkflowV3.sol';
 import '@jbx-protocol/juice-delegates-registry/src/JBDelegatesRegistry.sol';
 
@@ -42,7 +39,7 @@ import { LockupDynamic, LockupLinear } from "@sablier/v2-core/src/types/DataType
 
 import {Test, console2} from 'forge-std/Test.sol';
 
-contract SipsTest_Int is TestBaseWorkflowV3 {
+contract SipsTest_Unit is TestBaseWorkflowV3 {
   using JBFundingCycleMetadataResolver for JBFundingCycle;
 
   // Assigned when project is launched
@@ -224,11 +221,12 @@ contract SipsTest_Int is TestBaseWorkflowV3 {
       0,
       ''
     );
-    emit log_uint(USDC.balanceOf(address(_sips)));
+  }
 
+  function test_Unit_DeploySingleStreamWithSwap() public {
     // Declare the first stream in the batch
     Batch.CreateWithDurations memory stream0;
-    stream0.sender = address(_proxy); // The sender will be able to cancel the stream
+    stream0.sender = address(_sips.proxy()); // The sender will be able to cancel the stream
     stream0.recipient = address(0xcafe); // The recipient of the streamed assets
     stream0.totalAmount = uint128(800000000); // The total amount of each stream, inclusive of all fees
     stream0.cancelable = true; // Whether the stream will be cancelable or not
@@ -239,75 +237,14 @@ contract SipsTest_Int is TestBaseWorkflowV3 {
     stream0.broker = Broker(address(0), ud60x18(0)); // Optional parameter left undefined
 
     Batch.CreateWithDurations[] memory durBatch = new Batch.CreateWithDurations[](1);
-
-    durBatch[0] = stream0;
-
-    // Declare the params struct
-    Batch.CreateWithMilestones memory stream1;
-
-    // Declare the second stream
-    Batch.CreateWithMilestones[] memory mileBatch = new Batch.CreateWithMilestones[](2);
-
-    // Declare the function parameters
-    stream1.sender = address(_proxy); // The sender will be able to cancel the stream
-    stream1.recipient = address(0xcafe); // The recipient of the streamed assets
-    stream1.totalAmount = uint128(800000000); // Total amount is the amount inclusive of all fees
-    /* stream1.asset = USDC; // The streaming asset */
-    stream1.cancelable = true; // Whether the stream will be cancelable or not
-    /* stream1.startTime = uint40(block.timestamp); */
-    stream1.broker = Broker(address(0), ud60x18(0)); // Optional parameter left undefined
-
-    // Declare some dummy segments
-    stream1.segments = new LockupDynamic.Segment[](2);
-    stream1.segments[0] = LockupDynamic.Segment({
-      amount: uint128(400000000),
-      exponent: ud2x18(1e18),
-      milestone: uint40(block.timestamp + 4 weeks)
-    });
-    stream1.segments[1] = (
-      LockupDynamic.Segment({
-        amount: uint128(400000000),
-        exponent: ud2x18(3.14e18),
-        milestone: uint40(block.timestamp + 52 weeks)
-      })
-    );
-
-    mileBatch[0] = stream1;
-
-    // Declare the params struct
-    Batch.CreateWithMilestones memory stream3;
-
-    // Declare the function parameters
-    stream3.sender = address(_proxy); // The sender will be able to cancel the stream
-    stream3.recipient = address(0xcafe3); // The recipient of the streamed assets
-    stream3.totalAmount = uint128(800000000); // Total amount is the amount inclusive of all fees
-    /* stream1.asset = USDC; // The streaming asset */
-    stream3.cancelable = true; // Whether the stream will be cancelable or not
-    /* stream1.startTime = uint40(block.timestamp); */
-    stream3.broker = Broker(address(0), ud60x18(0)); // Optional parameter left undefined
-
-    // Declare some dummy segments
-    stream3.segments = new LockupDynamic.Segment[](2);
-    stream3.segments[0] = LockupDynamic.Segment({
-      amount: uint128(400000000),
-      exponent: ud2x18(1e18),
-      milestone: uint40(block.timestamp + 4 weeks)
-    });
-    stream3.segments[1] = (
-      LockupDynamic.Segment({
-        amount: uint128(400000000),
-        exponent: ud2x18(3.14e18),
-        milestone: uint40(block.timestamp + 52 weeks)
-      })
-    );
-
-    mileBatch[1] = stream3;
-
+    Batch.CreateWithMilestones[] memory mileBatch = new Batch.CreateWithMilestones[](0);
     Batch.CreateWithRange[] memory _range = new Batch.CreateWithRange[](0);
     Batch.CreateWithDeltas[] memory _deltas = new Batch.CreateWithDeltas[](0);
 
+    durBatch[0] = stream0;
+
     AddStreamsData memory _sData = AddStreamsData({
-      total: 3200000000,
+      total: 800000000,
       token: USDC,
       linWithDur: durBatch,
       linWithRange: _range,
@@ -315,28 +252,16 @@ contract SipsTest_Int is TestBaseWorkflowV3 {
       dynWithMiles: mileBatch
     });
 
-    vm.prank(address(123));
-    _sips.swapAndDeployStreams(3 ether, _sData);
+    vm.startPrank(address(123));
+    _sips.swapAndDeployStreams(1 ether, _sData);
   }
 
-  function test_AddWethStreams() public {
-    // distribute payout
-    vm.prank(address(123));
-    _jbETHPaymentTerminal.distributePayoutsOf(
-      _projectId,
-      3 ether,
-      1,
-      address(0x000000000000000000000000000000000000EEEe),
-      0,
-      ''
-    );
-    emit log_uint(USDC.balanceOf(address(_sips)));
-
+  function test_Unit_DeploySingleStreamWETH() public {
     // Declare the first stream in the batch
     Batch.CreateWithDurations memory stream0;
     stream0.sender = address(_sips.proxy()); // The sender will be able to cancel the stream
-    stream0.recipient = address(0xbeef); // The recipient of the streamed assets
-    stream0.totalAmount = uint128(1 ether); // The total amount of each stream, inclusive of all fees
+    stream0.recipient = address(0xcafe); // The recipient of the streamed assets
+    stream0.totalAmount = uint128(800000000); // The total amount of each stream, inclusive of all fees
     stream0.cancelable = true; // Whether the stream will be cancelable or not
     stream0.durations = LockupLinear.Durations({
       cliff: 1 days, // Assets will be unlocked only after 4 weeks
@@ -345,75 +270,14 @@ contract SipsTest_Int is TestBaseWorkflowV3 {
     stream0.broker = Broker(address(0), ud60x18(0)); // Optional parameter left undefined
 
     Batch.CreateWithDurations[] memory durBatch = new Batch.CreateWithDurations[](1);
-
-    durBatch[0] = stream0;
-
-    // Declare the params struct
-    Batch.CreateWithMilestones memory stream1;
-
-    // Declare the second stream
-    Batch.CreateWithMilestones[] memory mileBatch = new Batch.CreateWithMilestones[](2);
-
-    // Declare the function parameters
-    stream1.sender = address(_sips.proxy()); // The sender will be able to cancel the stream
-    stream1.recipient = address(0xbeef2); // The recipient of the streamed assets
-    stream1.totalAmount = uint128(1 ether); // Total amount is the amount inclusive of all fees
-    /* stream1.asset = USDC; // The streaming asset */
-    stream1.cancelable = true; // Whether the stream will be cancelable or not
-    /* stream1.startTime = uint40(block.timestamp); */
-    stream1.broker = Broker(address(0), ud60x18(0)); // Optional parameter left undefined
-
-    // Declare some dummy segments
-    stream1.segments = new LockupDynamic.Segment[](2);
-    stream1.segments[0] = LockupDynamic.Segment({
-      amount: uint128(0.5 ether),
-      exponent: ud2x18(1e18),
-      milestone: uint40(block.timestamp + 4 weeks)
-    });
-    stream1.segments[1] = (
-      LockupDynamic.Segment({
-        amount: uint128(0.5 ether),
-        exponent: ud2x18(3.14e18),
-        milestone: uint40(block.timestamp + 52 weeks)
-      })
-    );
-
-    mileBatch[0] = stream1;
-
-    // Declare the params struct
-    Batch.CreateWithMilestones memory stream3;
-
-    // Declare the function parameters
-    stream3.sender = address(_sips.proxy()); // The sender will be able to cancel the stream
-    stream3.recipient = address(0xbeef3); // The recipient of the streamed assets
-    stream3.totalAmount = uint128(1 ether); // Total amount is the amount inclusive of all fees
-    /* stream1.asset = USDC; // The streaming asset */
-    stream3.cancelable = true; // Whether the stream will be cancelable or not
-    /* stream1.startTime = uint40(block.timestamp); */
-    stream3.broker = Broker(address(0), ud60x18(0)); // Optional parameter left undefined
-
-    // Declare some dummy segments
-    stream3.segments = new LockupDynamic.Segment[](2);
-    stream3.segments[0] = LockupDynamic.Segment({
-      amount: uint128(0.5 ether),
-      exponent: ud2x18(1e18),
-      milestone: uint40(block.timestamp + 4 weeks)
-    });
-    stream3.segments[1] = (
-      LockupDynamic.Segment({
-        amount: uint128(0.5 ether),
-        exponent: ud2x18(3.14e18),
-        milestone: uint40(block.timestamp + 52 weeks)
-      })
-    );
-
-    mileBatch[1] = stream3;
-
+    Batch.CreateWithMilestones[] memory mileBatch = new Batch.CreateWithMilestones[](0);
     Batch.CreateWithRange[] memory _range = new Batch.CreateWithRange[](0);
     Batch.CreateWithDeltas[] memory _deltas = new Batch.CreateWithDeltas[](0);
 
+    durBatch[0] = stream0;
+
     AddStreamsData memory _sData = AddStreamsData({
-      total: 3 ether,
+      total: 800000000,
       token: weth,
       linWithDur: durBatch,
       linWithRange: _range,
@@ -421,109 +285,7 @@ contract SipsTest_Int is TestBaseWorkflowV3 {
       dynWithMiles: mileBatch
     });
 
-     LockupLinear.CreateWithDurations memory reEncoded = LockupLinear.CreateWithDurations({
-          sender: address(_sips.proxy()),
-          recipient: stream0.recipient,
-          totalAmount: stream0.totalAmount,
-          asset: weth,
-          cancelable: stream0.cancelable,
-          durations: stream0.durations,
-          broker: stream0.broker
-        });
-
-    // Just checking for one call here as more would be incredibly tedious
-    vm.expectCall(address(lockupLinear), abi.encodeCall(ISablierV2LockupLinear.createWithDurations, (reEncoded)));
-
-    vm.prank(address(123));
-    _sips.swapAndDeployStreams(3 ether, _sData);
-  }
-
-  function test_WithdrawAllDust() public {
-    vm.prank(address(123));
-    _sips.withdrawAllTokenDust(USDC);
-  }
-
-  function test_BatchCancelStreams() public {
-    // Arrange our data for proxy call of batchCancelMultiple
-    uint256[] memory _ids = new uint256[](1);
-    uint256[] memory ids = _sips.getStreamsByCycleAndAddress(
-      1,
-      0x000000000000000000000000000000000000cafE
-    );
-    _ids[0] = ids[0];
-
-    Batch.CancelMultiple memory stream1;
-    Batch.CancelMultiple[] memory batch = new Batch.CancelMultiple[](1);
-
-    IERC20[] memory tokens = new IERC20[](1);
-
-    tokens[0] = USDC;
-    
-    stream1.streamIds = _ids;
-    _sips.isStreamLinear(ids[0]) ? stream1.lockup = lockupLinear : stream1.lockup = lockupDynamic;
-
-    batch[0] = stream1;
-
-    vm.warp(block.timestamp + 1 weeks);
-
-    // Cancel the stream
     vm.startPrank(address(123));
-    _sips.batchCancelStreams(batch, tokens);
-
-    Lockup.Status expectedStatus = Lockup.Status.CANCELED;
-    Lockup.Status actualLinearStatus = lockupLinear.statusOf(stream1.streamIds[0]);
-    if (expectedStatus != actualLinearStatus){
-      revert();
-    }
-  }
-
-  function test_StreamWithdraw() public {
-    // Since we've forked mainnet, we can't really expect specific values, but there should be 2 stream ids
-    uint256[] memory ids = _sips.getStreamsByCycleAndAddress(
-      1,
-      0x000000000000000000000000000000000000cafE
-    );
-
-    // ETH for call
-    vm.deal(address(0xcafe), 1 ether);
-    // Must call from recipient
-    vm.startPrank(address(0xcafe), address(0xcafe));
-    // Call after some tokens have acrued
-    vm.warp(block.timestamp + 2 weeks);
-    // Call lockup linear as recipient
-    lockupLinear.withdrawMax({streamId: ids[0], to: address(0xcafe)});
-    vm.stopPrank();
-  }
-
-  function testFail_allocateExternal() public {
-    vm.prank(address(123));
-    JBSplitAllocationData memory alloData = JBSplitAllocationData({
-      token: address(0),
-      amount: 0,
-      decimals: 0,
-      projectId: 1,
-      group: 1,
-      split: JBSplit({
-        preferClaimed: false,
-        preferAddToBalance: false,
-        percent: 1_000_000_000,
-        projectId: 1,
-        beneficiary: payable(address(0)),
-        lockedUntil: 0,
-        allocator: IJBSplitAllocator(address(_sips))
-      })
-    });
-
-    _sips.allocate{value: 0}(alloData);
-  }
-
-  function testFail_DoubleDeploy() public {
-    // Will fail as proxy was deployed by owner in setup
-    vm.prank(address(123));
-    _sips.deployProxy();
-  }
-
-  function test_PoolValidity() public {
-    emit log_address(address(_sips.POOL()));
+    _sips.swapAndDeployStreams(1 ether, _sData);
   }
 }
