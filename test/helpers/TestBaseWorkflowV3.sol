@@ -34,8 +34,6 @@ import '@jbx-protocol/juice-contracts-v3/contracts/libraries/JBConstants.sol';
 
 import './AccessJBLib.sol';
 
-import '@paulrberg/contracts/math/PRBMath.sol';
-
 // Base contract for Juicebox system tests.
 //
 // Provides common functionality, such as deploying contracts on test setup for v3.
