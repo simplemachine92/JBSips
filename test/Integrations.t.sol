@@ -10,35 +10,28 @@ import {JBSips} from '../src/JBSips.sol';
 import {IJBSplitAllocator} from '@jbx-protocol/juice-contracts-v3/contracts/interfaces/IJBSplitAllocator.sol';
 import {JBSplitAllocationData} from '@jbx-protocol/juice-contracts-v3/contracts/structs/JBSplitAllocationData.sol';
 
-import {ISablierV2LockupDynamic} from 'lib/v2-periphery/lib/v2-core/src/interfaces/ISablierV2LockupDynamic.sol';
-import {ISablierV2LockupLinear} from 'lib/v2-periphery/lib/v2-core/src/interfaces/ISablierV2LockupLinear.sol';
+import {ISablierV2LockupDynamic} from '@sablier/v2-core/src/interfaces/ISablierV2LockupDynamic.sol';
+import {ISablierV2LockupLinear} from '@sablier/v2-core/src/interfaces/ISablierV2LockupLinear.sol';
 import {ISablierV2ProxyPlugin} from '@sablier/v2-periphery/src/interfaces/ISablierV2ProxyPlugin.sol';
 import {ISablierV2ProxyTarget} from '@sablier/v2-periphery/src/interfaces/ISablierV2ProxyTarget.sol';
 import {LockupLinear, LockupDynamic} from '@sablier/v2-periphery/src/types/DataTypes.sol';
 import {Batch, Broker} from '@sablier/v2-periphery/src/types/DataTypes.sol';
-import {ISablierV2Lockup} from '@sablier/v2-core/src/interfaces/ISablierV2Lockup.sol';
 import {ud2x18, ud60x18} from '@sablier/v2-core/src/types/Math.sol';
 
-import {IJBDelegatesRegistry} from '@jbx-protocol/juice-delegates-registry/src/interfaces/IJBDelegatesRegistry.sol';
 import {IJBFundingCycleBallot} from '@jbx-protocol/juice-contracts-v3/contracts/interfaces/IJBFundingCycleBallot.sol';
 import {JBGlobalFundingCycleMetadata} from '@jbx-protocol/juice-contracts-v3/contracts/structs/JBFundingCycleMetadata.sol';
-import {JBOperatorData} from '@jbx-protocol/juice-contracts-v3/contracts/structs/JBOperatorData.sol';
 import {JBSplit} from '@jbx-protocol/juice-contracts-v3/contracts/structs/JBSplit.sol';
 
-import {IERC20} from 'lib/v2-periphery/lib/v2-core/src/types/Tokens.sol';
+import {IERC20} from '@sablier/v2-core/src/types/Tokens.sol';
 import {IWETH9} from '../src/interfaces/external/IWETH9.sol';
 
 import {IUniswapV3Pool} from '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
-import {IUniswapV3SwapCallback} from '@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol';
-import {TickMath} from '@uniswap/v3-core/contracts/libraries/TickMath.sol';
 
 import {AddStreamsData} from '../src/structs/Streams.sol';
-import {IPRBProxy, IPRBProxyRegistry} from '@sablier/v2-periphery/src/types/Proxy.sol';
-import {Lockup} from 'lib/v2-periphery/lib/v2-core/src/types/DataTypes.sol';
+import {IPRBProxy} from '@sablier/v2-periphery/src/types/Proxy.sol';
+import {Lockup} from '@sablier/v2-core/src/types/DataTypes.sol';
 
 import {LockupDynamic, LockupLinear} from '@sablier/v2-core/src/types/DataTypes.sol';
-
-import {Test, console2} from 'forge-std/Test.sol';
 
 contract SipsTest_Int is TestBaseWorkflowV3 {
   using JBFundingCycleMetadataResolver for JBFundingCycle;
@@ -473,9 +466,7 @@ contract SipsTest_Int is TestBaseWorkflowV3 {
 
     Lockup.Status expectedStatus = Lockup.Status.CANCELED;
     Lockup.Status actualLinearStatus = lockupLinear.statusOf(stream1.streamIds[0]);
-    if (expectedStatus != actualLinearStatus) {
-      revert();
-    }
+    assertEq(uint8(expectedStatus), uint8(actualLinearStatus));
   }
 
   function test_StreamWithdraw() public {
@@ -489,14 +480,14 @@ contract SipsTest_Int is TestBaseWorkflowV3 {
     vm.deal(address(0xcafe), 1 ether);
     // Must call from recipient
     vm.startPrank(address(0xcafe), address(0xcafe));
-    // Call after some tokens have acrued
+    // Call after some tokens have accrued
     vm.warp(block.timestamp + 2 weeks);
     // Call lockup linear as recipient
     lockupLinear.withdrawMax({streamId: ids[0], to: address(0xcafe)});
     vm.stopPrank();
   }
 
-  function testFail_allocateExternal() public {
+  function testFail_AllocateExternal() public {
     vm.prank(address(123));
     JBSplitAllocationData memory alloData = JBSplitAllocationData({
       token: address(0),

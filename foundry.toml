@@ -1,4 +1,5 @@
 [profile.default]
+evm_version = "paris"
 src = "src"
 out = "out"
 libs = ["lib", 'node_modules']
@@ -6,4 +7,4 @@ match_contract = "Int || Unit"
 
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
 [rpc_endpoints]
-MAINNET_RPC_URL = "${MAINNET_RPC_URL}" 
+MAINNET_RPC_URL = "${MAINNET_RPC_URL}"

@@ -5,19 +5,17 @@ import {ERC1271} from './ERC1271.sol';
 import {AddStreamsData} from '../structs/Streams.sol';
 
 import {IJBSplitAllocator} from '@jbx-protocol/juice-contracts-v3/contracts/interfaces/IJBSplitAllocator.sol';
-import {IJBPaymentTerminal} from '@jbx-protocol/juice-contracts-v3/contracts/interfaces/IJBPaymentTerminal.sol';
 import {IJBDirectory} from '@jbx-protocol/juice-contracts-v3/contracts/interfaces/IJBDirectory.sol';
-import {IJBOperatorStore} from '@jbx-protocol/juice-contracts-v3/contracts/interfaces/IJBOperatorStore.sol';
 import {IJBController3_1} from '@jbx-protocol/juice-contracts-v3/contracts/interfaces/IJBController3_1.sol';
 
 import {IPRBProxy, IPRBProxyRegistry} from '@sablier/v2-periphery/src/types/Proxy.sol';
 import {ISablierV2ProxyTarget} from '@sablier/v2-periphery/src/interfaces/ISablierV2ProxyTarget.sol';
 import {ISablierV2ProxyPlugin} from '@sablier/v2-periphery/src/interfaces/ISablierV2ProxyPlugin.sol';
-import {ISablierV2LockupDynamic} from 'lib/v2-periphery/lib/v2-core/src/interfaces/ISablierV2LockupDynamic.sol';
-import {ISablierV2LockupLinear} from 'lib/v2-periphery/lib/v2-core/src/interfaces/ISablierV2LockupLinear.sol';
+import {ISablierV2LockupDynamic} from '@sablier/v2-core/src/interfaces/ISablierV2LockupDynamic.sol';
+import {ISablierV2LockupLinear} from '@sablier/v2-core/src/interfaces/ISablierV2LockupLinear.sol';
 
 import {ERC165} from '@openzeppelin/contracts/utils/introspection/ERC165.sol';
-import {IERC20} from 'lib/v2-periphery/lib/v2-core/src/types/Tokens.sol';
+import {IERC20} from '@sablier/v2-core/src/types/Tokens.sol';
 
 import {LockupLinear, LockupDynamic} from '@sablier/v2-periphery/src/types/DataTypes.sol';
 import {IAllowanceTransfer, Permit2Params} from '@sablier/v2-periphery/src/types/Permit2.sol';
@@ -27,7 +25,7 @@ import {IUniswapV3SwapCallback} from '@uniswap/v3-core/contracts/interfaces/call
 import {TickMath} from '@uniswap/v3-core/contracts/libraries/TickMath.sol';
 import {OracleLibrary} from '@uniswap/v3-periphery/contracts/libraries/OracleLibrary.sol';
 import {IWETH9} from '../interfaces/external/IWETH9.sol';
-import {IERC20} from 'lib/v2-periphery/lib/v2-core/src/types/Tokens.sol';
+import {IERC20} from '@sablier/v2-core/src/types/Tokens.sol';
 
 abstract contract JBSablier is ERC165, ERC1271, IUniswapV3SwapCallback {
   //*********************************************************************//
@@ -353,7 +351,7 @@ abstract contract JBSablier is ERC165, ERC1271, IUniswapV3SwapCallback {
     // Declare the Permit2 params needed by Sablier
     Permit2Params memory permit2Params;
     permit2Params.permitSingle = permitSingle;
-    permit2Params.signature = bytes(''); // dummy signature
+    permit2Params.signature = bytes(''); // dummy signature because this isa contract
 
     return permit2Params;
   }
