@@ -286,7 +286,7 @@ contract SipsTest_Unit is TestBaseWorkflowV3 {
       allocator: IJBSplitAllocator(address(_sips))
     });
 
-    JBSplitAllocationData memory _data = JBSplitAllocationData({
+    JBSplitAllocationData memory _testData = JBSplitAllocationData({
       token: address(0x000000000000000000000000000000000000EEEe),
       amount: 1 wei,
       decimals: 18,
@@ -295,7 +295,7 @@ contract SipsTest_Unit is TestBaseWorkflowV3 {
       split: splitData
     });
     vm.prank(address(_jbETHPaymentTerminal));
-    _sips.allocate{value: 1 wei}(_data);
+    _sips.allocate{value: 1 wei}(_testData);
   }
 
   function test_Unit_AllocateWithSwap() public {
@@ -311,7 +311,7 @@ contract SipsTest_Unit is TestBaseWorkflowV3 {
       allocator: IJBSplitAllocator(address(_sips))
     });
 
-    JBSplitAllocationData memory _data = JBSplitAllocationData({
+    JBSplitAllocationData memory _testData = JBSplitAllocationData({
       token: address(0x000000000000000000000000000000000000EEEe),
       amount: 1 ether,
       decimals: 18,
@@ -320,7 +320,7 @@ contract SipsTest_Unit is TestBaseWorkflowV3 {
       split: splitData
     });
     vm.prank(address(_jbETHPaymentTerminal));
-    _sips.allocate{value: 1 ether}(_data);
+    _sips.allocate{value: 1 ether}(_testData);
   }
 
   function test_Unit_DeploySingleStreamWithSwap() public {
