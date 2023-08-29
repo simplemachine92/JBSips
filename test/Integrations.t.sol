@@ -466,9 +466,7 @@ contract SipsTest_Int is TestBaseWorkflowV3 {
 
     Lockup.Status expectedStatus = Lockup.Status.CANCELED;
     Lockup.Status actualLinearStatus = lockupLinear.statusOf(stream1.streamIds[0]);
-    if (expectedStatus != actualLinearStatus) {
-      revert();
-    }
+    assertEq(uint8(expectedStatus), uint8(actualLinearStatus));
   }
 
   function test_StreamWithdraw() public {
@@ -482,14 +480,14 @@ contract SipsTest_Int is TestBaseWorkflowV3 {
     vm.deal(address(0xcafe), 1 ether);
     // Must call from recipient
     vm.startPrank(address(0xcafe), address(0xcafe));
-    // Call after some tokens have acrued
+    // Call after some tokens have accrued
     vm.warp(block.timestamp + 2 weeks);
     // Call lockup linear as recipient
     lockupLinear.withdrawMax({streamId: ids[0], to: address(0xcafe)});
     vm.stopPrank();
   }
 
-  function testFail_allocateExternal() public {
+  function testFail_AllocateExternal() public {
     vm.prank(address(123));
     JBSplitAllocationData memory alloData = JBSplitAllocationData({
       token: address(0),

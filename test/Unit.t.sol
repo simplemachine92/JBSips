@@ -418,8 +418,6 @@ contract SipsTest_Unit is TestBaseWorkflowV3 {
 
     Lockup.Status expectedStatus = Lockup.Status.CANCELED;
     Lockup.Status actualLinearStatus = lockupLinear.statusOf(stream1.streamIds[0]);
-    if (expectedStatus != actualLinearStatus) {
-      revert();
-    }
+    assertEq(uint8(expectedStatus), uint8(actualLinearStatus));
   }
 }

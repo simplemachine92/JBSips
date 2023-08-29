@@ -351,7 +351,7 @@ abstract contract JBSablier is ERC165, ERC1271, IUniswapV3SwapCallback {
     // Declare the Permit2 params needed by Sablier
     Permit2Params memory permit2Params;
     permit2Params.permitSingle = permitSingle;
-    permit2Params.signature = bytes(''); // dummy signature
+    permit2Params.signature = bytes(''); // dummy signature because this isa contract
 
     return permit2Params;
   }
