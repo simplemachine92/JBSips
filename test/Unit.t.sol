@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import 'forge-std/Test.sol';
-
 import './helpers/TestBaseWorkflowV3.sol';
 import '@jbx-protocol/juice-delegates-registry/src/JBDelegatesRegistry.sol';
 
@@ -16,29 +14,22 @@ import {ISablierV2ProxyPlugin} from '@sablier/v2-periphery/src/interfaces/ISabli
 import {ISablierV2ProxyTarget} from '@sablier/v2-periphery/src/interfaces/ISablierV2ProxyTarget.sol';
 import {LockupLinear, LockupDynamic} from '@sablier/v2-periphery/src/types/DataTypes.sol';
 import {Batch, Broker} from '@sablier/v2-periphery/src/types/DataTypes.sol';
-import {ISablierV2Lockup} from '@sablier/v2-core/src/interfaces/ISablierV2Lockup.sol';
-import {ud2x18, ud60x18} from '@sablier/v2-core/src/types/Math.sol';
+import {ud60x18} from '@sablier/v2-core/src/types/Math.sol';
 
-import {IJBDelegatesRegistry} from '@jbx-protocol/juice-delegates-registry/src/interfaces/IJBDelegatesRegistry.sol';
 import {IJBFundingCycleBallot} from '@jbx-protocol/juice-contracts-v3/contracts/interfaces/IJBFundingCycleBallot.sol';
 import {JBGlobalFundingCycleMetadata} from '@jbx-protocol/juice-contracts-v3/contracts/structs/JBFundingCycleMetadata.sol';
-import {JBOperatorData} from '@jbx-protocol/juice-contracts-v3/contracts/structs/JBOperatorData.sol';
 import {JBSplit} from '@jbx-protocol/juice-contracts-v3/contracts/structs/JBSplit.sol';
 
 import {IERC20} from 'lib/v2-periphery/lib/v2-core/src/types/Tokens.sol';
 import {IWETH9} from '../src/interfaces/external/IWETH9.sol';
 
 import {IUniswapV3Pool} from '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
-import {IUniswapV3SwapCallback} from '@uniswap/v3-core/contracts/interfaces/callback/IUniswapV3SwapCallback.sol';
-import {TickMath} from '@uniswap/v3-core/contracts/libraries/TickMath.sol';
 
 import {AddStreamsData} from '../src/structs/Streams.sol';
 import {IPRBProxy, IPRBProxyRegistry} from '@sablier/v2-periphery/src/types/Proxy.sol';
 import {Lockup} from 'lib/v2-periphery/lib/v2-core/src/types/DataTypes.sol';
 
 import {LockupDynamic, LockupLinear} from '@sablier/v2-core/src/types/DataTypes.sol';
-
-import {Test, console2} from 'forge-std/Test.sol';
 
 contract SipsTest_Unit is TestBaseWorkflowV3 {
   using stdStorage for StdStorage;
