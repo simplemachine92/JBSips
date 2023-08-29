@@ -18,13 +18,12 @@ import {JBFundingCycle} from '@jbx-protocol/juice-contracts-v3/contracts/structs
 
 import {ISablierV2ProxyTarget} from '@sablier/v2-periphery/src/interfaces/ISablierV2ProxyTarget.sol';
 import {ISablierV2ProxyPlugin} from '@sablier/v2-periphery/src/interfaces/ISablierV2ProxyPlugin.sol';
-import {ISablierV2LockupDynamic} from 'lib/v2-periphery/lib/v2-core/src/interfaces/ISablierV2LockupDynamic.sol';
-import {ISablierV2LockupLinear} from 'lib/v2-periphery/lib/v2-core/src/interfaces/ISablierV2LockupLinear.sol';
-import {IERC20} from 'lib/v2-periphery/lib/v2-core/src/types/Tokens.sol';
-
-import {IPRBProxy} from '@sablier/v2-periphery/src/types/Proxy.sol';
+import {ISablierV2LockupDynamic} from '@sablier/v2-core/src/interfaces/ISablierV2LockupDynamic.sol';
+import {ISablierV2LockupLinear} from '@sablier/v2-core/src/interfaces/ISablierV2LockupLinear.sol';
+import {IERC20} from '@sablier/v2-core/src/types/Tokens.sol';
 
 import {Batch} from '@sablier/v2-periphery/src/types/DataTypes.sol';
+import {IPRBProxy} from '@sablier/v2-periphery/src/types/Proxy.sol';
 
 /**
  * @custom:benediction DEVS BENEDICAT ET PROTEGAT CONTRACTVS MEAM

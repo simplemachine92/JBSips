@@ -1,4 +1,4 @@
-@sablier/v2-core=lib/v2-core
+@sablier/v2-core=lib/v2-periphery/lib/v2-core
 @sablier/v2-periphery=lib/v2-periphery
 @prb/math/=lib/prb-math
 @uniswap/v3-core=lib/univ3-core

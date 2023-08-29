@@ -8,8 +8,8 @@ import {JBSips} from '../src/JBSips.sol';
 import {IJBSplitAllocator} from '@jbx-protocol/juice-contracts-v3/contracts/interfaces/IJBSplitAllocator.sol';
 import {JBSplitAllocationData} from '@jbx-protocol/juice-contracts-v3/contracts/structs/JBSplitAllocationData.sol';
 
-import {ISablierV2LockupDynamic} from 'lib/v2-periphery/lib/v2-core/src/interfaces/ISablierV2LockupDynamic.sol';
-import {ISablierV2LockupLinear} from 'lib/v2-periphery/lib/v2-core/src/interfaces/ISablierV2LockupLinear.sol';
+import {ISablierV2LockupDynamic} from '@sablier/v2-core/src/interfaces/ISablierV2LockupDynamic.sol';
+import {ISablierV2LockupLinear} from '@sablier/v2-core/src/interfaces/ISablierV2LockupLinear.sol';
 import {ISablierV2ProxyPlugin} from '@sablier/v2-periphery/src/interfaces/ISablierV2ProxyPlugin.sol';
 import {ISablierV2ProxyTarget} from '@sablier/v2-periphery/src/interfaces/ISablierV2ProxyTarget.sol';
 import {LockupLinear, LockupDynamic} from '@sablier/v2-periphery/src/types/DataTypes.sol';
@@ -20,14 +20,14 @@ import {IJBFundingCycleBallot} from '@jbx-protocol/juice-contracts-v3/contracts/
 import {JBGlobalFundingCycleMetadata} from '@jbx-protocol/juice-contracts-v3/contracts/structs/JBFundingCycleMetadata.sol';
 import {JBSplit} from '@jbx-protocol/juice-contracts-v3/contracts/structs/JBSplit.sol';
 
-import {IERC20} from 'lib/v2-periphery/lib/v2-core/src/types/Tokens.sol';
+import {IERC20} from '@sablier/v2-core/src/types/Tokens.sol';
 import {IWETH9} from '../src/interfaces/external/IWETH9.sol';
 
 import {IUniswapV3Pool} from '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
 
 import {AddStreamsData} from '../src/structs/Streams.sol';
 import {IPRBProxy, IPRBProxyRegistry} from '@sablier/v2-periphery/src/types/Proxy.sol';
-import {Lockup} from 'lib/v2-periphery/lib/v2-core/src/types/DataTypes.sol';
+import {Lockup} from '@sablier/v2-core/src/types/DataTypes.sol';
 
 import {LockupDynamic, LockupLinear} from '@sablier/v2-core/src/types/DataTypes.sol';
 
