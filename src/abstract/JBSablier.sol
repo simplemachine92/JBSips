@@ -145,6 +145,10 @@ abstract contract JBSablier is ERC165, ERC1271, IUniswapV3SwapCallback {
     TARGET_TOKEN_IS_TOKEN0 = address(_token) < address(WETH);
     TARGET_TOKEN = address(_token);
 
+    // Approve tokens for transfer
+    IERC20(TARGET_TOKEN).approve({spender: address(PERMIT2), amount: type(uint256).max});
+    WETH.approve({spender: address(PERMIT2), amount: type(uint256).max});
+
     POOL = IUniswapV3Pool(
       address(
         uint160(
@@ -214,9 +218,6 @@ abstract contract JBSablier is ERC165, ERC1271, IUniswapV3SwapCallback {
 
     // Check if PRBProxy has been setup
     if (address(proxy) == address(0)) deployProxyAndInstallPlugin();
-
-    // Approve tokens for transfer
-    _data.token.approve({spender: address(PERMIT2), amount: type(uint256).max});
 
     // Encode and proxy.execute with data for the proxy target call if user defined each *stream type*
     if (_data.linWithDur.length > 0) {
